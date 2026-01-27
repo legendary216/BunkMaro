@@ -1,37 +1,142 @@
-import React, { useCallback, useState } from 'react';
-import { StyleSheet, View, RefreshControl, ScrollView, TouchableOpacity } from 'react-native';
-import { Text, Button, Card, ActivityIndicator, Chip } from 'react-native-paper';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useFocusEffect, useRouter } from 'expo-router';
+import React, { useCallback, useState } from "react";
+import {
+  StyleSheet,
+  View,
+  RefreshControl,
+  ScrollView,
+  Alert,
+  Modal,
+} from "react-native";
+import {
+  Text,
+  Button,
+  Card,
+  ActivityIndicator,
+  Chip,
+  Portal,
+  Provider,
+  List,
+} from "react-native-paper";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useFocusEffect, useRouter } from "expo-router";
 
-import { supabase } from '../../utils/supabase';
-import { Colors } from '../../constants/theme';
+import { supabase } from "../../utils/supabase";
+import { Colors } from "../../constants/theme";
 
-// --- SUB-COMPONENT: The Card that expands ---
-const ClassCard = ({ slot }: { slot: any }) => {
+// --- (ClassCard Component remains exactly the same as before) ---
+// ... Paste the ClassCard code here ...
+const ClassCard = ({
+  slot,
+  log,
+  onMark,
+}: {
+  slot: any;
+  log: any;
+  onMark: (status: string) => void;
+}) => {
   const [expanded, setExpanded] = useState(false);
+  const [loadingAction, setLoadingAction] = useState<
+    "PRESENT" | "BUNKED" | "POSTPONED" | null
+  >(null);
+  const isMarkable = !log;
+
+  const handlePress = async (status: "PRESENT" | "BUNKED" | "POSTPONED") => {
+    setLoadingAction(status);
+    await onMark(status);
+    setLoadingAction(null);
+  };
+
+  const renderStatusChip = () => {
+    if (!log) return <Chip icon="clock-outline">Pending</Chip>;
+    switch (log.status) {
+      case "PRESENT":
+        return (
+          <Chip
+            icon="check-circle"
+            style={{ backgroundColor: "#e8f5e9" }}
+            textStyle={{ color: "#2e7d32" }}
+          >
+            Present
+          </Chip>
+        );
+      case "BUNKED":
+        return (
+          <Chip
+            icon="close-circle"
+            style={{ backgroundColor: "#ffebee" }}
+            textStyle={{ color: "#d32f2f" }}
+          >
+            Bunked
+          </Chip>
+        );
+      case "POSTPONED":
+        return (
+          <Chip
+            icon="calendar-clock"
+            style={{ backgroundColor: "#fff3e0" }}
+            textStyle={{ color: "#e65100" }}
+          >
+            Postponed
+          </Chip>
+        );
+      default:
+        return <Chip>Unknown</Chip>;
+    }
+  };
 
   return (
     <Card style={styles.classCard} onPress={() => setExpanded(!expanded)}>
-      <Card.Content style={styles.classRow}>
-        {/* Left Side: Text Area */}
-        <View style={styles.textContainer}>
-          <Text 
-            variant="titleMedium" 
-            style={{ fontWeight: 'bold' }} 
-            numberOfLines={expanded ? undefined : 1} // Toggle lines
-          >
-            {slot.subjects?.name}
-          </Text>
-          <Text variant="bodySmall" style={{ color: '#666' }}>
-            {slot.start_time.slice(0, 5)} - {slot.end_time.slice(0, 5)}
-          </Text>
+      <Card.Content>
+        <View style={styles.classRow}>
+          <View style={styles.textContainer}>
+            <Text
+              variant="titleMedium"
+              style={{ fontWeight: "bold" }}
+              numberOfLines={expanded ? undefined : 1}
+            >
+              {slot.subjects?.name}
+            </Text>
+            <Text variant="bodySmall" style={{ color: "#666" }}>
+              {slot.start_time.slice(0, 5)} - {slot.end_time.slice(0, 5)}
+            </Text>
+          </View>
+          {renderStatusChip()}
         </View>
-
-        {/* Right Side: Status Chip */}
-        <Chip icon="clock-outline" style={{ flexShrink: 0 }}>
-          Upcoming
-        </Chip>
+        {isMarkable && expanded && (
+          <View>
+            <View style={styles.actionRow}>
+              <Button
+                mode="contained"
+                onPress={() => handlePress("BUNKED")}
+                loading={loadingAction === "BUNKED"}
+                disabled={loadingAction !== null}
+                style={[styles.actionBtn, { backgroundColor: "#ef5350" }]}
+              >
+                Bunk 😈
+              </Button>
+              <Button
+                mode="contained"
+                onPress={() => handlePress("PRESENT")}
+                loading={loadingAction === "PRESENT"}
+                disabled={loadingAction !== null}
+                style={[styles.actionBtn, { backgroundColor: "#66bb6a" }]}
+              >
+                Present 😇
+              </Button>
+            </View>
+            <Button
+              mode="text"
+              textColor="#f57c00"
+              compact
+              onPress={() => handlePress("POSTPONED")}
+              loading={loadingAction === "POSTPONED"}
+              disabled={loadingAction !== null}
+              style={{ marginTop: 5 }}
+            >
+              Lecture Postponed
+            </Button>
+          </View>
+        )}
       </Card.Content>
     </Card>
   );
@@ -42,44 +147,117 @@ export default function HomeScreen() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [semester, setSemester] = useState<any>(null);
-  const [todaySlots, setTodaySlots] = useState<any[]>([]);
-  const [refreshing, setRefreshing] = useState(false);
 
-  // Helper to get day name
-  const getDayName = () => {
-    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    return days[new Date().getDay()];
-  };
+  const [todaySlots, setTodaySlots] = useState<any[]>([]);
+  const [todayLogs, setTodayLogs] = useState<Record<number, any>>({});
+  const [subjects, setSubjects] = useState<any[]>([]);
+
+  // Stats State
+  const [subjectStats, setSubjectStats] = useState<Record<number, number>>({});
+
+  const [refreshing, setRefreshing] = useState(false);
+  const [extraModalVisible, setExtraModalVisible] = useState(false);
 
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data: sem, error } = await supabase
-        .from('semesters')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('is_active', true)
+      const { data: sem } = await supabase
+        .from("semesters")
+        .select("*")
+        .eq("user_id", user.id)
+        .eq("is_active", true)
         .maybeSingle();
-
-      if (error) throw error;
       setSemester(sem);
 
       if (sem) {
+        // 1. Fetch Today's Data First (for sorting logic)
         const todayIndex = new Date().getDay();
         const { data: slots } = await supabase
-          .from('timetable_slots')
-          .select('*, subjects(name)')
-          .eq('semester_id', sem.id)
-          .eq('day_of_week', todayIndex)
-          .order('start_time');
-
+          .from("timetable_slots")
+          .select("*, subjects(name)")
+          .eq("semester_id", sem.id)
+          .eq("day_of_week", todayIndex)
+          .order("start_time");
         if (slots) setTodaySlots(slots);
+
+        // Get list of subject IDs that are happening today
+        const todaysSubjectIds = new Set(slots?.map((s) => s.subject_id));
+
+        const todayStr = new Date().toISOString().split("T")[0];
+        const { data: dailyLogs } = await supabase
+          .from("attendance_logs")
+          .select("*")
+          .eq("date", todayStr);
+        const dailyMap: Record<number, any> = {};
+        if (dailyLogs)
+          dailyLogs.forEach((l) => {
+            dailyMap[l.subject_id] = l;
+          });
+        setTodayLogs(dailyMap);
+
+        // 2. Fetch Subjects & Calculate Stats
+        const { data: subData } = await supabase
+          .from("subjects")
+          .select("id, name")
+          .eq("semester_id", sem.id);
+        const subList = subData || [];
+
+        const { data: allLogs } = await supabase
+          .from("attendance_logs")
+          .select("*")
+          .eq("semester_id", sem.id);
+
+        // Calculate percentages
+        const statsMap: Record<number, number> = {};
+        subList.forEach((s) => {
+          // Filter logs for this subject
+          const sLogs =
+            allLogs?.filter(
+              (l) =>
+                l.subject_id === s.id &&
+                l.status !== "CANCELLED" &&
+                l.status !== "POSTPONED",
+            ) || [];
+          const total = sLogs.length;
+          const present = sLogs.filter((l) => l.status === "PRESENT").length;
+          statsMap[s.id] =
+            total === 0 ? 100 : Math.round((present / total) * 100);
+        });
+        setSubjectStats(statsMap);
+
+        // 3. SMART SORTING LOGIC
+        // Priority 1: Danger (< 75%)
+        // Priority 2: Happening Today
+        // Priority 3: Everything else
+        const sortedSubjects = [...subList].sort((a, b) => {
+          const statA = statsMap[a.id] ?? 100;
+          const statB = statsMap[b.id] ?? 100;
+          const isDangerA = statA < 75;
+          const isDangerB = statB < 75;
+
+          // If one is danger and other isn't, Danger wins
+          if (isDangerA && !isDangerB) return -1;
+          if (!isDangerA && isDangerB) return 1;
+
+          // If both are same safety level, prioritize "Today"
+          const isTodayA = todaysSubjectIds.has(a.id);
+          const isTodayB = todaysSubjectIds.has(b.id);
+          if (isTodayA && !isTodayB) return -1;
+          if (!isTodayA && isTodayB) return 1;
+
+          // Otherwise, simple alphabetical
+          return a.name.localeCompare(b.name);
+        });
+
+        setSubjects(sortedSubjects);
       }
     } catch (error: any) {
-      console.log('Error:', error.message);
+      console.log("Error:", error.message);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -89,110 +267,283 @@ export default function HomeScreen() {
   useFocusEffect(
     useCallback(() => {
       fetchDashboardData();
-    }, [])
+    }, []),
   );
-
   const onRefresh = () => {
     setRefreshing(true);
     fetchDashboardData();
   };
 
-  if (loading && !refreshing && !semester) {
+  // --- ACTIONS ---
+  const markAttendance = async (slot: any, status: string) => {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user || !semester) return;
+      const todayStr = new Date().toISOString().split("T")[0];
+      const { data, error } = await supabase
+        .from("attendance_logs")
+        .insert({
+          user_id: user.id,
+          semester_id: semester.id,
+          subject_id: slot.subject_id,
+          date: todayStr,
+          slot_time: slot.start_time,
+          status: status,
+        })
+        .select()
+        .single();
+      if (error) throw error;
+      setTodayLogs((prev) => ({ ...prev, [slot.subject_id]: data }));
+      fetchDashboardData();
+    } catch (e: any) {
+      Alert.alert("Error", e.message);
+    }
+  };
+
+  const handleExtraClass = async (
+    subjectId: number,
+    status: "PRESENT" | "BUNKED",
+  ) => {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user || !semester) return;
+      const todayStr = new Date().toISOString().split("T")[0];
+      const timeNow = new Date().toLocaleTimeString("en-US", { hour12: false });
+      await supabase.from("attendance_logs").insert({
+        user_id: user.id,
+        semester_id: semester.id,
+        subject_id: subjectId,
+        date: todayStr,
+        slot_time: timeNow,
+        status: status,
+      });
+      setExtraModalVisible(false);
+      fetchDashboardData();
+    } catch (e: any) {
+      Alert.alert("Error", e.message);
+    }
+  };
+
+  if (loading && !refreshing && !semester)
     return (
       <View style={[styles.center, { flex: 1 }]}>
-        <ActivityIndicator size="large" color={Colors.light.tint} />
+        <ActivityIndicator />
       </View>
     );
-  }
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: Colors.light.background }]}>
-      <ScrollView 
-        contentContainerStyle={styles.scrollContent}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+    <Provider>
+      <SafeAreaView
+        style={[styles.container, { backgroundColor: Colors.light.background }]}
       >
-        <View style={styles.header}>
-          <Text variant="headlineMedium" style={{ fontWeight: 'bold' }}>Dashboard</Text>
-          <Text variant="bodyLarge" style={{ color: Colors.light.icon }}>
-            {getDayName()}, {new Date().toDateString()}
-          </Text>
-        </View>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+        >
+          <View style={styles.header}>
+            <Text variant="headlineMedium" style={{ fontWeight: "bold" }}>
+              Dashboard
+            </Text>
+            <Text variant="bodyLarge" style={{ color: Colors.light.icon }}>
+              {new Date().toDateString()}
+            </Text>
+          </View>
 
-        {!semester ? (
-          <Card style={styles.card}>
-            <Card.Content>
-              <Text variant="titleLarge" style={styles.cardTitle}>Welcome to Bunk Maro!</Text>
-              <Text variant="bodyMedium" style={styles.cardBody}>
-                You don't have an active semester yet.
-              </Text>
-            </Card.Content>
-            <Card.Actions>
-              <Button mode="contained" buttonColor={Colors.light.tint} onPress={() => router.push('/semester-setup')}>
-                Start New Semester
-              </Button>
-            </Card.Actions>
-          </Card>
-        ) : (
-          <View>
+          {!semester ? (
             <Card style={styles.card}>
               <Card.Content>
-                <Text variant="titleMedium">Current Semester</Text>
-                <Text variant="headlineLarge" style={{ color: Colors.light.tint, fontWeight: 'bold' }}>
-                  {semester.name}
-                </Text>
-                <View style={styles.buttonRow}>
-                   <Button mode="outlined" onPress={() => router.push('/manage-subjects')} style={styles.smallBtn}>
-                      Subjects
-                   </Button>
-                   <Button mode="outlined" onPress={() => router.push('/manage-timetable')} style={styles.smallBtn}>
-                      Timetable
-                   </Button>
-                </View>
+                <Text>No active semester.</Text>
               </Card.Content>
+              <Card.Actions>
+                <Button onPress={() => router.push("/semester-setup")}>
+                  Start
+                </Button>
+              </Card.Actions>
             </Card>
+          ) : (
+            <View>
+              {/* SMART SCROLL LIST */}
+              {subjects.length > 0 && (
+                <View style={{ marginBottom: 20 }}>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={{ paddingRight: 20 }}
+                  >
+                    {subjects.map((sub) => {
+                      const pct = subjectStats[sub.id] || 100;
+                      const isDanger = pct < 75;
+                      return (
+                        <Card
+                          key={sub.id}
+                          style={{
+                            marginRight: 12,
+                            width: 140,
+                            backgroundColor: isDanger ? "#ffebee" : "white",
+                            borderColor: isDanger ? "#ef5350" : "transparent",
+                            borderWidth: isDanger ? 1 : 0,
+                          }}
+                        >
+                          <Card.Content
+                            style={{
+                              alignItems: "center",
+                              paddingVertical: 10,
+                            }}
+                          >
+                            <Text
+                              variant="displaySmall"
+                              style={{
+                                fontWeight: "bold",
+                                color: isDanger ? "#d32f2f" : "#2e7d32",
+                              }}
+                            >
+                              {pct}%
+                            </Text>
+                            <Text
+                              variant="labelMedium"
+                              numberOfLines={1}
+                              style={{
+                                marginTop: 5,
+                                fontWeight: isDanger ? "bold" : "normal",
+                              }}
+                            >
+                              {sub.name}
+                            </Text>
+                          </Card.Content>
+                        </Card>
+                      );
+                    })}
+                  </ScrollView>
+                </View>
+              )}
 
-            <Text variant="titleLarge" style={styles.sectionTitle}>Today's Classes</Text>
-            
-            {todaySlots.length === 0 ? (
-              <Card style={styles.card}>
-                <Card.Content>
-                  <Text style={{ textAlign: 'center', opacity: 0.6 }}>No classes scheduled for today! 🎉</Text>
-                </Card.Content>
-              </Card>
-            ) : (
-              // USE THE NEW SUB-COMPONENT HERE
-              todaySlots.map((slot) => (
-                <ClassCard key={slot.id} slot={slot} />
-              ))
-            )}
-          </View>
-        )}
-      </ScrollView>
-    </SafeAreaView>
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
+                <Text variant="titleLarge" style={styles.sectionTitle}>
+                  Today's Classes
+                </Text>
+                <Button
+                  mode="text"
+                  compact
+                  onPress={() => setExtraModalVisible(true)}
+                >
+                  + Extra Class
+                </Button>
+              </View>
+
+              {todaySlots.length === 0 ? (
+                <Card style={styles.card}>
+                  <Card.Content>
+                    <Text style={{ textAlign: "center", opacity: 0.6 }}>
+                      No classes scheduled today.
+                    </Text>
+                  </Card.Content>
+                </Card>
+              ) : (
+                todaySlots.map((slot) => (
+                  <ClassCard
+                    key={slot.id}
+                    slot={slot}
+                    log={todayLogs[slot.subject_id]}
+                    onMark={(status) => markAttendance(slot, status)}
+                  />
+                ))
+              )}
+
+              <View style={styles.buttonRow}>
+                <Button
+                  mode="outlined"
+                  onPress={() => router.push("/manage-subjects")}
+                  style={styles.smallBtn}
+                >
+                  Subjects
+                </Button>
+                <Button
+                  mode="outlined"
+                  onPress={() => router.push("/manage-timetable")}
+                  style={styles.smallBtn}
+                >
+                  Timetable
+                </Button>
+              </View>
+            </View>
+          )}
+        </ScrollView>
+
+        <Portal>
+          <Modal
+            visible={extraModalVisible}
+            onDismiss={() => setExtraModalVisible(false)}
+            contentContainerStyle={styles.modal}
+          >
+            <Text variant="titleLarge" style={{ marginBottom: 15 }}>
+              Log Extra Class
+            </Text>
+            {subjects.map((sub) => (
+              <List.Item
+                key={sub.id}
+                title={sub.name}
+                right={(props) => (
+                  <View style={{ flexDirection: "row" }}>
+                    <Button onPress={() => handleExtraClass(sub.id, "PRESENT")}>
+                      Present
+                    </Button>
+                    <Button
+                      onPress={() => handleExtraClass(sub.id, "BUNKED")}
+                      textColor="red"
+                    >
+                      Bunk
+                    </Button>
+                  </View>
+                )}
+              />
+            ))}
+            <Button onPress={() => setExtraModalVisible(false)}>Cancel</Button>
+          </Modal>
+        </Portal>
+      </SafeAreaView>
+    </Provider>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  center: { justifyContent: 'center', alignItems: 'center' },
+  center: { justifyContent: "center", alignItems: "center" },
   scrollContent: { padding: 20 },
-  header: { marginBottom: 20 },
-  card: { marginBottom: 16, backgroundColor: 'white' },
-  cardTitle: { fontWeight: 'bold', marginBottom: 8 },
-  cardBody: { marginBottom: 16, color: '#666' },
-  buttonRow: { flexDirection: 'row', marginTop: 16, gap: 10 },
+  header: { marginBottom: 10 },
+  card: { marginBottom: 16, backgroundColor: "white" },
+  buttonRow: { flexDirection: "row", marginTop: 20, gap: 10, marginBottom: 20 },
   smallBtn: { flex: 1 },
-  sectionTitle: { fontWeight: 'bold', marginBottom: 10, marginTop: 10 },
-  
-  // Card Styles
-  classCard: { marginBottom: 10, backgroundColor: 'white' },
-  classRow: { 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    alignItems: 'center',
+  sectionTitle: { fontWeight: "bold", marginBottom: 10, marginTop: 10 },
+  classCard: { marginBottom: 10, backgroundColor: "white" },
+  classRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
-  textContainer: {
-    flex: 1,
-    marginRight: 10,
-  }
+  textContainer: { flex: 1, marginRight: 10 },
+  actionRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 15,
+    justifyContent: "flex-end",
+  },
+  actionBtn: { flex: 1 },
+  modal: {
+    backgroundColor: "white",
+    padding: 20,
+    margin: 20,
+    borderRadius: 10,
+  },
 });
