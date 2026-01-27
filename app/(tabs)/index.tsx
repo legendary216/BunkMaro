@@ -5,7 +5,6 @@ import {
   RefreshControl,
   ScrollView,
   Alert,
-  
   TouchableOpacity,
 } from "react-native";
 import {
@@ -80,6 +79,17 @@ const ClassCard = ({
             Postponed
           </Chip>
         );
+      case "HOLIDAY":
+        return (
+          <Chip
+            icon="beach"
+            style={{ backgroundColor: "#e0f7fa" }}
+            textStyle={{ color: "#006064" }}
+          >
+            Holiday
+          </Chip>
+        );
+
       default:
         return <Chip>Unknown</Chip>;
     }
@@ -168,21 +178,19 @@ export default function HomeScreen() {
       } = await supabase.auth.getUser();
       if (!user) return;
 
-      
       const { data: sem } = await supabase
-      .from("semesters")
-      .select("*")
-      .eq("user_id", user.id)
-      .eq("is_active", true)
-      .maybeSingle();
+        .from("semesters")
+        .select("*")
+        .eq("user_id", user.id)
+        .eq("is_active", true)
+        .maybeSingle();
       setSemester(sem);
-      
+
       if (!sem) {
         setSemester(null);
         setLoading(false);
         return;
       }
-
 
       if (sem) {
         const todayIndex = new Date().getDay();
@@ -225,7 +233,8 @@ export default function HomeScreen() {
               (l) =>
                 l.subject_id === s.id &&
                 l.status !== "CANCELLED" &&
-                l.status !== "POSTPONED",
+                l.status !== "POSTPONED" &&
+                l.status !== "HOLIDAY",
             ) || [];
           const total = sLogs.length;
           const present = sLogs.filter((l) => l.status === "PRESENT").length;
@@ -271,60 +280,121 @@ export default function HomeScreen() {
     fetchDashboardData();
   };
 
-  const markAttendance = async (slot: any, status: string) => {
+ const markAttendance = async (slot: any, status: string) => {
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user || !semester) return;
-      const todayStr = new Date().toISOString().split("T")[0];
-      const { data, error } = await supabase
-        .from("attendance_logs")
-        .insert({
-          user_id: user.id,
-          semester_id: semester.id,
-          subject_id: slot.subject_id,
-          date: todayStr,
-          slot_time: slot.start_time,
-          status: status,
-        })
-        .select()
-        .single();
-      if (error) throw error;
-      setTodayLogs((prev) => ({ ...prev, [slot.subject_id]: data }));
-      fetchDashboardData(true);
-    } catch (e: any) {
-      Alert.alert("Error", e.message);
+        // We don't set global 'setLoading(true)' here because ClassCard has its own spinner.
+        // This prevents the whole screen from flashing white when you mark just one class.
+        
+        const { data: { user } } = await supabase.auth.getUser();
+        if(!user || !semester) throw new Error("User not found");
+
+        const todayStr = new Date().toISOString().split('T')[0];
+        
+        const { data, error } = await supabase.from('attendance_logs').insert({
+            user_id: user.id, semester_id: semester.id, subject_id: slot.subject_id, 
+            date: todayStr, slot_time: slot.start_time, status: status
+        }).select().single();
+
+        if(error) throw error;
+        
+        // Optimistic Update: Update local state immediately
+        setTodayLogs(prev => ({ ...prev, [slot.subject_id]: data }));
+        
+        // Background Refresh (doesn't block UI)
+        fetchDashboardData(true); 
+
+    } catch(e: any) { 
+        Alert.alert('Error', e.message);
     }
   };
 
-  const handleExtraClass = async (
-    subjectId: number,
-    status: "PRESENT" | "BUNKED",
-  ) => {
-    try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user || !semester) return;
-      const todayStr = new Date().toISOString().split("T")[0];
-      const timeNow = new Date().toLocaleTimeString("en-US", { hour12: false });
-      await supabase.from("attendance_logs").insert({
-        user_id: user.id,
-        semester_id: semester.id,
-        subject_id: subjectId,
-        date: todayStr,
-        slot_time: timeNow,
-        status: status,
-      });
-      setExtraModalVisible(false);
-      fetchDashboardData();
-    } catch (e: any) {
-      Alert.alert("Error", e.message);
-    }
+  const handleExtraClass = async (subjectId: number, status: 'PRESENT' | 'BUNKED') => {
+      // 1. START LOADER
+      setLoading(true);
+      
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if(!user || !semester) throw new Error("No active semester.");
+
+        const todayStr = new Date().toISOString().split('T')[0];
+        const timeNow = new Date().toLocaleTimeString('en-US', { hour12: false });
+
+        const { error } = await supabase.from('attendance_logs').insert({
+            user_id: user.id, 
+            semester_id: semester.id, 
+            subject_id: subjectId, 
+            date: todayStr, 
+            slot_time: timeNow, 
+            status: status
+        });
+
+        if (error) throw error;
+
+        // 2. SUCCESS: Close modal and Refresh
+        setExtraModalVisible(false);
+        await fetchDashboardData(false); // Refreshes and then turns off spinner
+
+      } catch(e: any) {
+        // 3. ERROR
+        setLoading(false);
+        Alert.alert('Error', e.message);
+      }
   };
 
-  if (loading && !refreshing )
+  const handleHoliday = () => {
+    Alert.alert('Mark Holiday?', 'This will mark ALL remaining classes today as "Holiday".', [
+      { text: 'Cancel', style: 'cancel' },
+      { 
+        text: 'Yes, Enjoy! 🏖️', 
+        onPress: async () => {
+          // 1. START LOADER (Blocks interaction)
+          setLoading(true);
+          
+          try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user || !semester) throw new Error("Active semester not found.");
+
+            const todayStr = new Date().toISOString().split('T')[0];
+            const updates = [];
+
+            // Loop through today's slots to find pending ones
+            for (const slot of todaySlots) {
+              if (!todayLogs[slot.subject_id]) {
+                updates.push({
+                  user_id: user.id,
+                  semester_id: semester.id,
+                  subject_id: slot.subject_id,
+                  date: todayStr,
+                  slot_time: slot.start_time,
+                  status: 'HOLIDAY'
+                });
+              }
+            }
+
+            if (updates.length > 0) {
+              const { error } = await supabase.from('attendance_logs').insert(updates);
+              if (error) throw error; // Go to catch block if DB fails
+
+              // 2. SUCCESS: Refresh Data (Spinner stays on until this finishes)
+              await fetchDashboardData(false); 
+              Alert.alert('Success', 'Holiday marked! Enjoy your day.');
+            } else {
+              // Nothing to update
+              setLoading(false); 
+              Alert.alert('Info', 'All classes are already marked!');
+            }
+
+          } catch (error: any) {
+            // 3. ERROR HANDLER
+            setLoading(false); // Turn off loader manually
+            Alert.alert('Error', error.message || 'Something went wrong.');
+          }
+        }
+      }
+    ]);
+  };
+
+  if (loading && !refreshing)
     return (
       <View style={[styles.center, { flex: 1 }]}>
         <ActivityIndicator size="large" color={Colors.light.tint} />
@@ -440,6 +510,14 @@ export default function HomeScreen() {
                   onPress={() => setExtraModalVisible(true)}
                 >
                   + Extra Class
+                </Button>
+                <Button
+                  mode="text"
+                  compact
+                  onPress={handleHoliday}
+                  textColor="#f57c00"
+                >
+                  Holiday
                 </Button>
               </View>
 

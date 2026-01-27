@@ -81,7 +81,8 @@ export default function ArchivedSemestersScreen() {
             (l) =>
               l.subject_id === sub.id &&
               l.status !== "CANCELLED" &&
-              l.status !== "POSTPONED",
+              l.status !== "POSTPONED"&&
+               l.status !== "HOLIDAY",
           ) || [];
         const total = subLogs.length;
         const present = subLogs.filter((l) => l.status === "PRESENT").length;
