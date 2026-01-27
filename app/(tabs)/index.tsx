@@ -229,7 +229,7 @@ export default function HomeScreen() {
             total === 0 ? 100 : Math.round((present / total) * 100);
         });
         setSubjectStats(statsMap);
-
+       // console.log("all percentage ",statsMap)
         // 3. SMART SORTING LOGIC
         // Priority 1: Danger (< 75%)
         // Priority 2: Happening Today
@@ -255,6 +255,8 @@ export default function HomeScreen() {
         });
 
         setSubjects(sortedSubjects);
+        //console.log(sortedSubjects);
+        
       }
     } catch (error: any) {
       console.log("Error:", error.message);
@@ -377,7 +379,9 @@ export default function HomeScreen() {
                     contentContainerStyle={{ paddingRight: 20 }}
                   >
                     {subjects.map((sub) => {
-                      const pct = subjectStats[sub.id] || 100;
+                      const pct = subjectStats[sub.id] ??  100;
+                      //console.log("subject : ",sub,"subject stats",subjectStats[sub.id]);
+                      
                       const isDanger = pct < 75;
                       return (
                         <Card
