@@ -5,7 +5,8 @@ import {
   RefreshControl,
   ScrollView,
   Alert,
-  Modal,
+  
+  TouchableOpacity,
 } from "react-native";
 import {
   Text,
@@ -16,6 +17,7 @@ import {
   Portal,
   Provider,
   List,
+  Modal
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect, useRouter } from "expo-router";
@@ -229,7 +231,7 @@ export default function HomeScreen() {
             total === 0 ? 100 : Math.round((present / total) * 100);
         });
         setSubjectStats(statsMap);
-       // console.log("all percentage ",statsMap)
+        // console.log("all percentage ",statsMap)
         // 3. SMART SORTING LOGIC
         // Priority 1: Danger (< 75%)
         // Priority 2: Happening Today
@@ -256,7 +258,6 @@ export default function HomeScreen() {
 
         setSubjects(sortedSubjects);
         //console.log(sortedSubjects);
-        
       }
     } catch (error: any) {
       console.log("Error:", error.message);
@@ -379,48 +380,53 @@ export default function HomeScreen() {
                     contentContainerStyle={{ paddingRight: 20 }}
                   >
                     {subjects.map((sub) => {
-                      const pct = subjectStats[sub.id] ??  100;
+                      const pct = subjectStats[sub.id] ?? 100;
                       //console.log("subject : ",sub,"subject stats",subjectStats[sub.id]);
-                      
                       const isDanger = pct < 75;
+
                       return (
-                        <Card
+                        <TouchableOpacity
                           key={sub.id}
-                          style={{
-                            marginRight: 12,
-                            width: 140,
-                            backgroundColor: isDanger ? "#ffebee" : "white",
-                            borderColor: isDanger ? "#ef5350" : "transparent",
-                            borderWidth: isDanger ? 1 : 0,
-                          }}
+                          onPress={() => router.push(`../subject/${sub.id}`)} // <--- NAVIGATION LINK
+                          activeOpacity={0.8}
                         >
-                          <Card.Content
+                          <Card
                             style={{
-                              alignItems: "center",
-                              paddingVertical: 10,
+                              marginRight: 12,
+                              width: 140,
+                              backgroundColor: isDanger ? "#ffebee" : "white",
+                              borderColor: isDanger ? "#ef5350" : "transparent",
+                              borderWidth: isDanger ? 1 : 0,
                             }}
                           >
-                            <Text
-                              variant="displaySmall"
+                            <Card.Content
                               style={{
-                                fontWeight: "bold",
-                                color: isDanger ? "#d32f2f" : "#2e7d32",
+                                alignItems: "center",
+                                paddingVertical: 10,
                               }}
                             >
-                              {pct}%
-                            </Text>
-                            <Text
-                              variant="labelMedium"
-                              numberOfLines={1}
-                              style={{
-                                marginTop: 5,
-                                fontWeight: isDanger ? "bold" : "normal",
-                              }}
-                            >
-                              {sub.name}
-                            </Text>
-                          </Card.Content>
-                        </Card>
+                              <Text
+                                variant="displaySmall"
+                                style={{
+                                  fontWeight: "bold",
+                                  color: isDanger ? "#d32f2f" : "#2e7d32",
+                                }}
+                              >
+                                {pct}%
+                              </Text>
+                              <Text
+                                variant="labelMedium"
+                                numberOfLines={1}
+                                style={{
+                                  marginTop: 5,
+                                  fontWeight: isDanger ? "bold" : "normal",
+                                }}
+                              >
+                                {sub.name}
+                              </Text>
+                            </Card.Content>
+                          </Card>
+                        </TouchableOpacity>
                       );
                     })}
                   </ScrollView>
