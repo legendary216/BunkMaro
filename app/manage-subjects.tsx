@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, View, FlatList, Keyboard, Alert } from 'react-native';
-import { Text, TextInput, Button, IconButton, Appbar, List, Divider } from 'react-native-paper';
+import { Text, TextInput, Button, IconButton, Appbar, List, Divider,ActivityIndicator } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 
@@ -20,6 +20,7 @@ export default function ManageSubjectsScreen() {
   }, []);
 
   async function fetchData() {
+    setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
@@ -51,6 +52,9 @@ export default function ManageSubjectsScreen() {
 
     } catch (error) {
       console.log(error);
+    }
+    finally{
+      setLoading(false);
     }
   }
 
@@ -91,6 +95,14 @@ export default function ManageSubjectsScreen() {
       // Remove from UI instantly
       setSubjects(subjects.filter(s => s.id !== id));
     }
+  }
+
+  if (loading && subjects.length === 0) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.light.background }}>
+        <ActivityIndicator size="large" color={Colors.light.tint} />
+      </View>
+    );
   }
 
   return (

@@ -16,8 +16,8 @@ import {
   Chip,
   Portal,
   Provider,
+  Modal,
   List,
-  Modal
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect, useRouter } from "expo-router";
@@ -25,8 +25,7 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { supabase } from "../../utils/supabase";
 import { Colors } from "../../constants/theme";
 
-// --- (ClassCard Component remains exactly the same as before) ---
-// ... Paste the ClassCard code here ...
+// ... (ClassCard remains EXACTLY the same, keep it here) ...
 const ClassCard = ({
   slot,
   log,
@@ -153,31 +152,39 @@ export default function HomeScreen() {
   const [todaySlots, setTodaySlots] = useState<any[]>([]);
   const [todayLogs, setTodayLogs] = useState<Record<number, any>>({});
   const [subjects, setSubjects] = useState<any[]>([]);
-
-  // Stats State
   const [subjectStats, setSubjectStats] = useState<Record<number, number>>({});
 
   const [refreshing, setRefreshing] = useState(false);
   const [extraModalVisible, setExtraModalVisible] = useState(false);
 
-  const fetchDashboardData = async () => {
+  // isBackground = true  -> Don't show full screen spinner (for marking attendance/refreshing)
+  // isBackground = false -> Show full screen spinner (for tab switching)
+  const fetchDashboardData = async (isBackground = false) => {
     try {
-      setLoading(true);
+      if (!isBackground) setLoading(true);
+
       const {
         data: { user },
       } = await supabase.auth.getUser();
       if (!user) return;
 
+      
       const { data: sem } = await supabase
-        .from("semesters")
-        .select("*")
-        .eq("user_id", user.id)
-        .eq("is_active", true)
-        .maybeSingle();
+      .from("semesters")
+      .select("*")
+      .eq("user_id", user.id)
+      .eq("is_active", true)
+      .maybeSingle();
       setSemester(sem);
+      
+      if (!sem) {
+        setSemester(null);
+        setLoading(false);
+        return;
+      }
+
 
       if (sem) {
-        // 1. Fetch Today's Data First (for sorting logic)
         const todayIndex = new Date().getDay();
         const { data: slots } = await supabase
           .from("timetable_slots")
@@ -187,9 +194,7 @@ export default function HomeScreen() {
           .order("start_time");
         if (slots) setTodaySlots(slots);
 
-        // Get list of subject IDs that are happening today
         const todaysSubjectIds = new Set(slots?.map((s) => s.subject_id));
-
         const todayStr = new Date().toISOString().split("T")[0];
         const { data: dailyLogs } = await supabase
           .from("attendance_logs")
@@ -202,7 +207,6 @@ export default function HomeScreen() {
           });
         setTodayLogs(dailyMap);
 
-        // 2. Fetch Subjects & Calculate Stats
         const { data: subData } = await supabase
           .from("subjects")
           .select("id, name")
@@ -214,10 +218,8 @@ export default function HomeScreen() {
           .select("*")
           .eq("semester_id", sem.id);
 
-        // Calculate percentages
         const statsMap: Record<number, number> = {};
         subList.forEach((s) => {
-          // Filter logs for this subject
           const sLogs =
             allLogs?.filter(
               (l) =>
@@ -231,33 +233,25 @@ export default function HomeScreen() {
             total === 0 ? 100 : Math.round((present / total) * 100);
         });
         setSubjectStats(statsMap);
-        // console.log("all percentage ",statsMap)
-        // 3. SMART SORTING LOGIC
-        // Priority 1: Danger (< 75%)
-        // Priority 2: Happening Today
-        // Priority 3: Everything else
+
         const sortedSubjects = [...subList].sort((a, b) => {
           const statA = statsMap[a.id] ?? 100;
           const statB = statsMap[b.id] ?? 100;
           const isDangerA = statA < 75;
           const isDangerB = statB < 75;
 
-          // If one is danger and other isn't, Danger wins
           if (isDangerA && !isDangerB) return -1;
           if (!isDangerA && isDangerB) return 1;
 
-          // If both are same safety level, prioritize "Today"
           const isTodayA = todaysSubjectIds.has(a.id);
           const isTodayB = todaysSubjectIds.has(b.id);
           if (isTodayA && !isTodayB) return -1;
           if (!isTodayA && isTodayB) return 1;
 
-          // Otherwise, simple alphabetical
           return a.name.localeCompare(b.name);
         });
 
         setSubjects(sortedSubjects);
-        //console.log(sortedSubjects);
       }
     } catch (error: any) {
       console.log("Error:", error.message);
@@ -269,7 +263,7 @@ export default function HomeScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      fetchDashboardData();
+      fetchDashboardData(false);
     }, []),
   );
   const onRefresh = () => {
@@ -277,7 +271,6 @@ export default function HomeScreen() {
     fetchDashboardData();
   };
 
-  // --- ACTIONS ---
   const markAttendance = async (slot: any, status: string) => {
     try {
       const {
@@ -299,7 +292,7 @@ export default function HomeScreen() {
         .single();
       if (error) throw error;
       setTodayLogs((prev) => ({ ...prev, [slot.subject_id]: data }));
-      fetchDashboardData();
+      fetchDashboardData(true);
     } catch (e: any) {
       Alert.alert("Error", e.message);
     }
@@ -331,10 +324,10 @@ export default function HomeScreen() {
     }
   };
 
-  if (loading && !refreshing && !semester)
+  if (loading && !refreshing )
     return (
       <View style={[styles.center, { flex: 1 }]}>
-        <ActivityIndicator />
+        <ActivityIndicator size="large" color={Colors.light.tint} />
       </View>
     );
 
@@ -381,13 +374,11 @@ export default function HomeScreen() {
                   >
                     {subjects.map((sub) => {
                       const pct = subjectStats[sub.id] ?? 100;
-                      //console.log("subject : ",sub,"subject stats",subjectStats[sub.id]);
                       const isDanger = pct < 75;
-
                       return (
                         <TouchableOpacity
                           key={sub.id}
-                          onPress={() => router.push(`../subject/${sub.id}`)} // <--- NAVIGATION LINK
+                          onPress={() => router.push(`/subject/${sub.id}`)}
                           activeOpacity={0.8}
                         >
                           <Card
@@ -471,22 +462,7 @@ export default function HomeScreen() {
                 ))
               )}
 
-              <View style={styles.buttonRow}>
-                <Button
-                  mode="outlined"
-                  onPress={() => router.push("/manage-subjects")}
-                  style={styles.smallBtn}
-                >
-                  Subjects
-                </Button>
-                <Button
-                  mode="outlined"
-                  onPress={() => router.push("/manage-timetable")}
-                  style={styles.smallBtn}
-                >
-                  Timetable
-                </Button>
-              </View>
+              {/* REMOVED: Manage Buttons are now in Profile */}
             </View>
           )}
         </ScrollView>
@@ -533,8 +509,6 @@ const styles = StyleSheet.create({
   scrollContent: { padding: 20 },
   header: { marginBottom: 10 },
   card: { marginBottom: 16, backgroundColor: "white" },
-  buttonRow: { flexDirection: "row", marginTop: 20, gap: 10, marginBottom: 20 },
-  smallBtn: { flex: 1 },
   sectionTitle: { fontWeight: "bold", marginBottom: 10, marginTop: 10 },
   classCard: { marginBottom: 10, backgroundColor: "white" },
   classRow: {
