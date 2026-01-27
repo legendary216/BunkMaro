@@ -394,6 +394,57 @@ export default function HomeScreen() {
     ]);
   };
 
+  const handleBunkToday = () => {
+    Alert.alert('Mass Bunk?', 'This will mark ALL remaining classes today as "BUNKED". Your attendance % will drop.', [
+      { text: 'Cancel', style: 'cancel' },
+      { 
+        text: 'I am sleeping 😴', 
+        style: 'destructive', // Makes the button red on iOS
+        onPress: async () => {
+          setLoading(true); // 1. Start Spinner
+          
+          try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user || !semester) throw new Error("Active semester not found.");
+
+            const todayStr = new Date().toISOString().split('T')[0];
+            const updates = [];
+
+            // Loop through today's slots
+            for (const slot of todaySlots) {
+              // Only mark if NOT already logged (don't overwrite 'Present' ones)
+              if (!todayLogs[slot.subject_id]) {
+                updates.push({
+                  user_id: user.id,
+                  semester_id: semester.id,
+                  subject_id: slot.subject_id,
+                  date: todayStr,
+                  slot_time: slot.start_time,
+                  status: 'BUNKED' // <--- The key difference
+                });
+              }
+            }
+
+            if (updates.length > 0) {
+              const { error } = await supabase.from('attendance_logs').insert(updates);
+              if (error) throw error;
+
+              await fetchDashboardData(false); // 2. Refresh Data
+              Alert.alert('Done', 'Today marked as Bunked.');
+            } else {
+              setLoading(false);
+              Alert.alert('Info', 'All classes are already marked!');
+            }
+
+          } catch (error: any) {
+            setLoading(false);
+            Alert.alert('Error', error.message);
+          }
+        }
+      }
+    ]);
+  };
+
   if (loading && !refreshing)
     return (
       <View style={[styles.center, { flex: 1 }]}>
@@ -504,6 +555,8 @@ export default function HomeScreen() {
                 <Text variant="titleLarge" style={styles.sectionTitle}>
                   Today's Classes
                 </Text>
+
+                <Button mode="text" compact onPress={handleBunkToday} textColor="#ef5350">Bunk Today</Button>
                 <Button
                   mode="text"
                   compact
@@ -519,6 +572,7 @@ export default function HomeScreen() {
                 >
                   Holiday
                 </Button>
+                <Button mode="text" compact onPress={() => setExtraModalVisible(true)}>+ Extra</Button>
               </View>
 
               {todaySlots.length === 0 ? (
