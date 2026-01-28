@@ -530,7 +530,14 @@ export default function HomeScreen() {
                     {getGreeting()}
                 </Text>
             </View>
-            <Avatar.Icon size={48} icon="account" style={{ backgroundColor: THEME.cardBg }} color={THEME.textPrimary} />
+           <TouchableOpacity onPress={() => router.push('/profile')}>
+  <Avatar.Icon 
+    size={48} 
+    icon="account" 
+    style={{ backgroundColor: THEME.cardBg }} 
+    color={THEME.textPrimary} 
+  />
+</TouchableOpacity>
           </View>
 
           {!semester ? (
