@@ -1,58 +1,76 @@
 import React from 'react';
-import FontAwesome from '@expo/vector-icons/FontAwesome';
+// Changed from FontAwesome to MaterialCommunityIcons for a cleaner look
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
+import { Platform } from 'react-native';
 
-import { Colors } from '../../constants/theme';
+const DARK_THEME = {
+  bg: '#121212',           
+  tabBarBg: '#1E1E1E',     
+  active: '#BB86FC',       // Purple Accent
+  inactive: '#757575',     
+};
 
 /**
  * Helper component to render Tab Bar icons.
- * You can explore the built-in icon families and icons on the web at https://icons.expo.fyi/
  */
 function TabBarIcon(props: {
-  name: React.ComponentProps<typeof FontAwesome>['name'];
+  name: React.ComponentProps<typeof MaterialCommunityIcons>['name'];
   color: string;
 }) {
-  return <FontAwesome size={28} style={{ marginBottom: -3 }} {...props} />;
+  // Increased size slightly to 26 for better visibility
+  return <MaterialCommunityIcons size={26} style={{ marginBottom: -3 }} {...props} />;
 }
 
 export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors.light.tint,
-        headerShown: false, // We hide the default header to use our own Appbar
+        tabBarActiveTintColor: DARK_THEME.active,
+        tabBarInactiveTintColor: DARK_THEME.inactive,
+        headerShown: false,
+        
         tabBarStyle: {
-            paddingBottom: 5, // Adds a little padding for better spacing on Android
-            height: 60,
+            backgroundColor: DARK_THEME.tabBarBg,
+            borderTopWidth: 0, 
+            elevation: 0,      
+            height: Platform.OS === 'ios' ? 88 : 60,
+            paddingBottom: Platform.OS === 'ios' ? 20 : 8,
+            paddingTop: 8,
         },
         tabBarLabelStyle: {
-            paddingBottom: 5
+            fontWeight: '600',
+            fontSize: 10,
         }
       }}>
       
-      {/* 1. Home Tab */}
+      {/* 1. Dashboard Tab */}
       <Tabs.Screen
         name="index"
         options={{
           title: 'Dashboard',
-          tabBarIcon: ({ color }) => <TabBarIcon name="home" color={color} />,
+          // Icon: A grid view, perfect for a dashboard
+          tabBarIcon: ({ color }) => <TabBarIcon name="view-dashboard" color={color} />,
         }}
       />
 
+      {/* 2. History Tab */}
       <Tabs.Screen
         name="calendar"
         options={{
           title: 'History',
-          tabBarIcon: ({ color }) => <TabBarIcon name="calendar" color={color} />,
+          // Icon: A calendar with a checkmark (fits attendance perfectly)
+          tabBarIcon: ({ color }) => <TabBarIcon name="calendar-check" color={color} />,
         }}
       />
 
-      {/* 2. Profile Tab (New) */}
+      {/* 3. Profile Tab */}
       <Tabs.Screen
         name="profile"
         options={{
           title: 'Profile',
-          tabBarIcon: ({ color }) => <TabBarIcon name="user" color={color} />,
+          // Icon: A clean user circle
+          tabBarIcon: ({ color }) => <TabBarIcon name="account-circle" color={color} />,
         }}
       />
     </Tabs>

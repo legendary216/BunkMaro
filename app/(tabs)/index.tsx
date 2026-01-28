@@ -658,36 +658,65 @@ export default function HomeScreen() {
             onDismiss={() => setExtraModalVisible(false)}
             contentContainerStyle={styles.modal}
           >
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 15 }}>
-                <IconButton icon="plus-box" size={24} iconColor={THEME.accent} />
-                <Text variant="titleLarge" style={{ fontWeight: 'bold', color: THEME.textPrimary }}>Log Extra Class</Text>
+            {/* HEADER */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                    <Avatar.Icon size={36} icon="plus" style={{ backgroundColor: THEME.accent }} color="#000" />
+                    <View>
+                        <Text variant="titleMedium" style={{ fontWeight: 'bold', color: THEME.textPrimary }}>Extra Class</Text>
+                        <Text variant="labelSmall" style={{ color: THEME.textSecondary }}>Select subject to log</Text>
+                    </View>
+                </View>
+                <IconButton icon="close" size={20} iconColor={THEME.textSecondary} onPress={() => setExtraModalVisible(false)} />
             </View>
-            <Divider style={{ marginBottom: 10, backgroundColor: THEME.divider }} />
             
-            <ScrollView style={{ maxHeight: 300 }}>
+            <Divider style={{ marginBottom: 15, backgroundColor: THEME.divider }} />
+            
+            {/* SUBJECT LIST */}
+            <ScrollView style={{ maxHeight: 400 }} showsVerticalScrollIndicator={false}>
                 {subjects.map((sub) => (
-                <List.Item
-                    key={sub.id}
-                    title={sub.name}
-                    titleStyle={{ fontWeight: '600', color: THEME.textPrimary }}
-                    style={{ backgroundColor: THEME.bg, borderRadius: 8, marginBottom: 5 }}
-                    right={(props) => (
-                    <View style={{ flexDirection: "row", alignItems: 'center' }}>
-                        <Button compact mode="text" textColor={THEME.success} onPress={() => handleExtraClass(sub.id, "PRESENT")}>
-                        Present
-                        </Button>
-                        <View style={{ width: 1, height: 15, backgroundColor: '#444', marginHorizontal: 5 }} />
-                        <Button compact mode="text" textColor={THEME.danger} onPress={() => handleExtraClass(sub.id, "BUNKED")}>
+                <View key={sub.id} style={styles.subjectRow}>
+                    {/* Subject Name */}
+                    <Text 
+                        numberOfLines={1} 
+                        style={{ 
+                            flex: 1, 
+                            color: THEME.textPrimary, 
+                            fontWeight: '600', 
+                            fontSize: 15,
+                            marginRight: 10 
+                        }}
+                    >
+                        {sub.name}
+                    </Text>
+
+                    {/* Action Buttons */}
+                    <View style={{ flexDirection: "row", gap: 8 }}>
+                        <Button 
+                            mode="outlined" 
+                            compact 
+                            textColor={THEME.danger} 
+                            style={{ borderColor: THEME.danger, borderWidth: 1 }}
+                            labelStyle={{ marginHorizontal: 10, fontSize: 12 }}
+                            onPress={() => handleExtraClass(sub.id, "BUNKED")}
+                        >
                         Bunk
                         </Button>
+
+                        <Button 
+                            mode="contained" 
+                            compact 
+                            buttonColor={THEME.success}
+                            textColor="#000" // Black text on Teal looks sharp
+                            labelStyle={{ marginHorizontal: 10, fontSize: 12, fontWeight: 'bold' }}
+                            onPress={() => handleExtraClass(sub.id, "PRESENT")}
+                        >
+                        Attend
+                        </Button>
                     </View>
-                    )}
-                />
+                </View>
                 ))}
             </ScrollView>
-            <Button mode="contained" buttonColor={THEME.cardBg} style={{ marginTop: 20 }} onPress={() => setExtraModalVisible(false)}>
-                Close
-            </Button>
           </Modal>
         </Portal>
       </SafeAreaView>
@@ -797,11 +826,27 @@ const styles = StyleSheet.create({
   },
 
   // MODAL
-  modal: {
-    backgroundColor: THEME.cardBg,
-    padding: 25,
+ modal: {
+    backgroundColor: THEME.cardBg, // #1E1E1E
+    padding: 20,
     margin: 20,
-    borderRadius: 20,
-    elevation: 5
+    borderRadius: 24, // Softer, more modern corners
+    borderWidth: 1,
+    borderColor: '#333', // Subtle border to make it pop against the dark background
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.5,
+    shadowRadius: 20,
   },
+  subjectRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      backgroundColor: '#2A2A2A', // Slightly lighter than modal bg
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      borderRadius: 16,
+      marginBottom: 8,
+  }
 });
