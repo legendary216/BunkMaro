@@ -45,6 +45,7 @@ const THEME = {
 };
 
 // --- COMPONENT: MODERN CLASS CARD ---
+// --- COMPONENT: MODERN CLASS CARD (Neon Outline) ---
 const ClassCard = ({
   slot,
   log,
@@ -71,7 +72,7 @@ const ClassCard = ({
     switch (status) {
       case "PRESENT": return THEME.success;
       case "BUNKED": return THEME.danger;
-      case "HOLIDAY": return "#4FC3F7"; // Light Blue
+      case "HOLIDAY": return "#4FC3F7"; 
       case "POSTPONED": return THEME.warning;
       default: return "#757575";
     }
@@ -80,7 +81,7 @@ const ClassCard = ({
   const getStatusIcon = (status: string) => {
     switch (status) {
       case "PRESENT": return "check";
-      case "BUNKED": return "close";
+      case "BUNKED": return "close"; // Changed to simple close for cleaner look
       case "HOLIDAY": return "beach";
       case "POSTPONED": return "clock-outline";
       default: return "help";
@@ -106,7 +107,7 @@ const ClassCard = ({
         {/* Right: Info Column */}
         <View style={styles.infoColumn}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-            <View style={{ flex: 1 }}>
+            <View style={{ flex: 1, paddingRight: 8 }}>
               <Text variant="titleMedium" style={{ fontWeight: "700", color: THEME.textPrimary, marginBottom: 2 }}>
                 {slot.subjects?.name}
               </Text>
@@ -115,24 +116,24 @@ const ClassCard = ({
               </Text>
             </View>
             
-            {/* Status Badge */}
-           {log ? (
+            {/* --- NEON OUTLINE BADGE --- */}
+            {log ? (
               <View style={{
                   flexDirection: 'row',
                   alignItems: 'center',
                   borderColor: getStatusColor(log.status),
-                  borderWidth: 1,           // Crisp border
-                  borderRadius: 8,          // Slightly square corners
+                  borderWidth: 1.5,         // Slightly thicker border for neon effect
+                  borderRadius: 8,
                   paddingHorizontal: 8,
                   paddingVertical: 4,
-                  backgroundColor: 'transparent' // See-through
+                  backgroundColor: 'transparent'
               }}>
-                 {/* Using Text Icon instead of IconButton to remove padding */}
+                 {/* Icon with no background */}
                  <Avatar.Icon 
-                    size={16} 
+                    size={18} 
                     icon={getStatusIcon(log.status)} 
                     color={getStatusColor(log.status)} 
-                    style={{ backgroundColor: 'transparent', marginRight: 4 }} 
+                    style={{ backgroundColor: 'transparent', margin: 0, marginRight: 2 }} 
                  />
                  <Text style={{ 
                      color: getStatusColor(log.status), 
@@ -148,10 +149,10 @@ const ClassCard = ({
               // Pending State
               <View style={{ 
                   flexDirection: 'row', alignItems: 'center', 
-                  backgroundColor: '#333', borderRadius: 8, 
-                  paddingHorizontal: 8, paddingVertical: 4 
+                  backgroundColor: '#252525', borderRadius: 8, 
+                  paddingHorizontal: 10, paddingVertical: 6
               }}>
-                 <Text style={{ color: '#888', fontWeight: 'bold', fontSize: 10 }}>PENDING</Text>
+                 <Text style={{ color: '#666', fontWeight: 'bold', fontSize: 10, letterSpacing: 0.5 }}>PENDING</Text>
               </View>
             )}
           </View>
@@ -176,7 +177,7 @@ const ClassCard = ({
                   onPress={() => handlePress("PRESENT")}
                   loading={loadingAction === "PRESENT"}
                   style={{ flex: 1, backgroundColor: THEME.success }}
-                  textColor="#000" // Black text on Teal looks sharp
+                  textColor="#000"
                   icon="check"
                 >
                   Attend
