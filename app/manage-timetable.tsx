@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import {
   StyleSheet,
   View,
@@ -6,20 +6,18 @@ import {
   Alert,
   ScrollView,
   TouchableOpacity,
+  Dimensions
 } from "react-native";
 import {
   Text,
   Button,
-  Appbar,
-  List,
   Modal,
   Portal,
   Provider,
   ActivityIndicator,
   Surface,
   IconButton,
-  Divider,
-  Avatar
+  Divider
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { DateTimePickerAndroid } from "@react-native-community/datetimepicker";
@@ -37,10 +35,10 @@ const THEME = {
   divider: '#333',      
   success: '#03DAC6',      
   danger: '#CF6679',       
-  warning: '#FFB74D',      
 };
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const SCREEN_WIDTH = Dimensions.get('window').width;
 
 export default function ManageTimetableScreen() {
   const router = useRouter();
@@ -51,6 +49,10 @@ export default function ManageTimetableScreen() {
   const [selectedDay, setSelectedDay] = useState(1); // Default to Monday
   const [slots, setSlots] = useState<any[]>([]);
   const [subjects, setSubjects] = useState<any[]>([]);
+
+  // Refs for Swipe & Scroll
+  const scrollRef = useRef<ScrollView>(null);
+  const touchStart = useRef({ x: 0, y: 0 });
 
   // Modal State
   const [visible, setVisible] = useState(false);
@@ -63,8 +65,16 @@ export default function ManageTimetableScreen() {
   useEffect(() => {
     loadData();
   }, []);
+
   useEffect(() => {
     if (semesterId) fetchSlots(semesterId, selectedDay);
+    
+    // Auto-scroll the day tabs when selectedDay changes
+    if (scrollRef.current) {
+        // Simple calculation: roughly 70px per tab. 
+        // Centers the active tab slightly.
+        scrollRef.current.scrollTo({ x: (selectedDay * 70) - (SCREEN_WIDTH / 2) + 35, animated: true });
+    }
   }, [selectedDay, semesterId]);
 
   async function loadData() {
@@ -96,10 +106,9 @@ export default function ManageTimetableScreen() {
     }
   }
 
-async function fetchSlots(semId: number, day: number) {
+  async function fetchSlots(semId: number, day: number) {
     setLoading(true);
-    // Optional: Clear slots immediately so the list doesn't show old data if we switch back quickly
-    setSlots([]); 
+    setSlots([]); // Clear list for "Full Loader" effect
     
     const { data } = await supabase
       .from("timetable_slots")
@@ -109,9 +118,36 @@ async function fetchSlots(semId: number, day: number) {
       .order("start_time");
       
     if (data) setSlots(data);
-    setLoading(false); // Stop loading only AFTER data is set
+    setLoading(false);
   }
 
+  // --- SWIPE LOGIC ---
+  const handleTouchStart = (e: any) => {
+      touchStart.current = { x: e.nativeEvent.pageX, y: e.nativeEvent.pageY };
+  };
+
+  const handleTouchEnd = (e: any) => {
+      const touchEnd = { x: e.nativeEvent.pageX, y: e.nativeEvent.pageY };
+      
+      const dx = touchStart.current.x - touchEnd.x;
+      const dy = touchStart.current.y - touchEnd.y;
+
+      // 1. Check if horizontal swipe is dominant (more than vertical scroll)
+      if (Math.abs(dx) > Math.abs(dy)) {
+          // 2. Check threshold (must swipe at least 50px)
+          if (Math.abs(dx) > 50) {
+              if (dx > 0) {
+                  // Swiped Left -> Next Day
+                  if (selectedDay < 6) setSelectedDay(prev => prev + 1);
+              } else {
+                  // Swiped Right -> Prev Day
+                  if (selectedDay > 0) setSelectedDay(prev => prev - 1);
+              }
+          }
+      }
+  };
+
+  // ... (Keep existing Modal/Delete/TimePicker logic same as before) ...
   const showTimePicker = (mode: "start" | "end") => {
     DateTimePickerAndroid.open({
       value: mode === "start" ? startTime : endTime,
@@ -131,7 +167,6 @@ async function fetchSlots(semId: number, day: number) {
       Alert.alert("Validation", "Please select a subject.");
       return;
     }
-
     setLoading(true);
     try {
       const { error } = await supabase.from("timetable_slots").insert({
@@ -141,9 +176,7 @@ async function fetchSlots(semId: number, day: number) {
         start_time: startTime.toLocaleTimeString("en-US", { hour12: false }),
         end_time: endTime.toLocaleTimeString("en-US", { hour12: false }),
       });
-
       if (error) throw error;
-
       setVisible(false);
       setNewSlotSubject(null);
       fetchSlots(semesterId, selectedDay);
@@ -182,7 +215,12 @@ async function fetchSlots(semId: number, day: number) {
 
         {/* --- DAY SELECTOR --- */}
         <View style={styles.dayTabs}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingRight: 20 }}>
+          <ScrollView 
+            ref={scrollRef}
+            horizontal 
+            showsHorizontalScrollIndicator={false} 
+            contentContainerStyle={{ paddingRight: 20 }}
+          >
             {DAYS.map((day, index) => (
               <TouchableOpacity
                 key={index}
@@ -207,57 +245,61 @@ async function fetchSlots(semId: number, day: number) {
             ))}
           </ScrollView>
         </View>
-{loading ? (
-          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-             <ActivityIndicator size="large" color={THEME.accent} />
-             <Text style={{ marginTop: 15, color: THEME.textSecondary }}>Fetching schedule...</Text>
-          </View>
-        ) : (
-          <FlatList
-            data={slots}
-            keyExtractor={(item) => item.id.toString()}
-            contentContainerStyle={styles.listContent}
-            // Removed 'refreshing' prop since we handle the UI manually now
-            renderItem={({ item }) => (
-            <Surface style={styles.card} elevation={1}>
-                {/* Left Section: Time + Name (Wrapped in flex: 1 to fill available space) */}
-                <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 8 }}>
-                    <View style={styles.timeBox}>
-                        <Text style={{ color: THEME.textPrimary, fontWeight: 'bold' }}>{item.start_time.slice(0, 5)}</Text>
-                        <Text style={{ color: THEME.textSecondary, fontSize: 10 }}>{item.end_time.slice(0, 5)}</Text>
+
+        {/* --- CONTENT AREA (SWIPEABLE) --- */}
+        <View 
+            style={{ flex: 1 }}
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
+        >
+            {loading ? (
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                <ActivityIndicator size="large" color={THEME.accent} />
+                <Text style={{ marginTop: 15, color: THEME.textSecondary }}>Fetching schedule...</Text>
+            </View>
+            ) : (
+            <FlatList
+                data={slots}
+                keyExtractor={(item) => item.id.toString()}
+                contentContainerStyle={styles.listContent}
+                renderItem={({ item }) => (
+                <Surface style={styles.card} elevation={1}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 8 }}>
+                        <View style={styles.timeBox}>
+                            <Text style={{ color: THEME.textPrimary, fontWeight: 'bold' }}>{item.start_time.slice(0, 5)}</Text>
+                            <Text style={{ color: THEME.textSecondary, fontSize: 10 }}>{item.end_time.slice(0, 5)}</Text>
+                        </View>
+                        <View style={{ marginLeft: 15, flex: 1 }}>
+                            <Text 
+                                variant="titleMedium" 
+                                numberOfLines={1} 
+                                ellipsizeMode="tail"
+                                style={{ color: THEME.textPrimary, fontWeight: '600' }}
+                            >
+                                {item.subjects?.name || "Unknown"}
+                            </Text>
+                        </View>
                     </View>
                     
-                    {/* Text Container: Added flex: 1 to ensure it truncates before hitting the button */}
-                    <View style={{ marginLeft: 15, flex: 1 }}>
-                        <Text 
-                            variant="titleMedium" 
-                            numberOfLines={1} 
-                            ellipsizeMode="tail" 
-                            style={{ color: THEME.textPrimary, fontWeight: '600' }}
-                        >
-                            {item.subjects?.name || "Unknown"}
-                        </Text>
-                    </View>
+                    <IconButton 
+                        icon="close-circle-outline" 
+                        iconColor={THEME.danger} 
+                        size={22}
+                        onPress={() => handleDelete(item.id)}
+                        style={{ margin: 0 }}
+                    />
+                </Surface>
+                )}
+                ListEmptyComponent={
+                <View style={{ alignItems: 'center', marginTop: 50, opacity: 0.5 }}>
+                    <IconButton icon="gesture-swipe" size={50} iconColor={THEME.textSecondary} />
+                    <Text style={{ color: THEME.textSecondary }}>No classes on {DAYS[selectedDay]}.</Text>
+                    <Text style={{ color: '#444', fontSize: 12 }}>Swipe left/right to change days</Text>
                 </View>
-                
-                {/* Right Section: Delete Button */}
-                <IconButton 
-                    icon="close-circle-outline" 
-                    iconColor={THEME.danger} 
-                    size={22}
-                    style={{ margin: 0 }}
-                    onPress={() => handleDelete(item.id)}
-                />
-            </Surface>
-          )}
-            ListEmptyComponent={
-              <View style={{ alignItems: 'center', marginTop: 50, opacity: 0.5 }}>
-                <IconButton icon="calendar-sleep" size={50} iconColor={THEME.textSecondary} />
-                <Text style={{ color: THEME.textSecondary }}>No classes scheduled for {DAYS[selectedDay]}.</Text>
-              </View>
-            }
-          />
-        )}
+                }
+            />
+            )}
+        </View>
 
         <Button
           mode="contained"
@@ -270,6 +312,7 @@ async function fetchSlots(semId: number, day: number) {
           Add Class to {DAYS[selectedDay]}
         </Button>
 
+        {/* --- ADD MODAL (Same as before) --- */}
         <Portal>
           <Modal
             visible={visible}

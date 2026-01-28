@@ -14,6 +14,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { scheduleDailyReminder, cancelReminders } from '../../utils/notifications';
+import ScreenWrapper from '../ScreenWrapper';
 
 import { supabase } from "../../utils/supabase";
 
@@ -129,6 +130,8 @@ export default function ProfileScreen() {
   };
 
   return (
+    <ScreenWrapper onSwipeRight={() => router.push('/calendar')}>
+
     <SafeAreaView style={[styles.container, { backgroundColor: THEME.bg }]}>
       <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
         
@@ -141,7 +144,7 @@ export default function ProfileScreen() {
                 style={{ backgroundColor: THEME.accent }} 
                 color="#000"
                 labelStyle={{ fontWeight: 'bold' }}
-             />
+                />
              <View style={styles.onlineBadge} />
           </View>
           
@@ -167,13 +170,13 @@ export default function ProfileScreen() {
                         descriptionStyle={{ color: THEME.success }}
                         left={(props) => <List.Icon {...props} icon="school" color={THEME.accent} />}
                         right={(props) => <IconButton icon="archive-arrow-down" iconColor={THEME.danger} onPress={handleEndSemester} />}
-                    />
+                        />
                 </View>
               ) : (
-                 <List.Item
-                    title="No Active Semester"
-                    titleStyle={{ color: THEME.textSecondary }}
-                    left={(props) => <List.Icon {...props} icon="alert-circle-outline" color={THEME.textSecondary} />}
+                <List.Item
+                title="No Active Semester"
+                titleStyle={{ color: THEME.textSecondary }}
+                left={(props) => <List.Icon {...props} icon="alert-circle-outline" color={THEME.textSecondary} />}
                 />
               )}
           </Surface>
@@ -189,7 +192,7 @@ export default function ProfileScreen() {
                 left={(props) => <List.Icon {...props} icon="book-open-variant" color={THEME.accent} />}
                 onPress={() => router.push("/manage-subjects")}
                 right={props => <List.Icon {...props} icon="chevron-right" color={THEME.textSecondary} />}
-             />
+                />
              <Divider style={{ backgroundColor: THEME.divider }} />
              <List.Item
                 title="Manage Timetable"
@@ -199,7 +202,7 @@ export default function ProfileScreen() {
                 left={(props) => <List.Icon {...props} icon="calendar-clock" color={THEME.accent} />}
                 onPress={() => router.push("/manage-timetable")}
                 right={props => <List.Icon {...props} icon="chevron-right" color={THEME.textSecondary} />}
-             />
+                />
              <Divider style={{ backgroundColor: THEME.divider }} />
              <List.Item
                 title="Past Semesters"
@@ -209,7 +212,7 @@ export default function ProfileScreen() {
                 left={(props) => <List.Icon {...props} icon="history" color={THEME.accent} />}
                 onPress={() => router.push('/archived-semesters')}
                 right={props => <List.Icon {...props} icon="chevron-right" color={THEME.textSecondary} />}
-             />
+                />
           </Surface>
 
           {/* --- SECTION 3: APP SETTINGS --- */}
@@ -222,13 +225,13 @@ export default function ProfileScreen() {
                 descriptionStyle={{ color: THEME.textSecondary }}
                 left={(props) => <List.Icon {...props} icon="bell-ring" color={THEME.warning} />}
                 right={() => (
-                    <Switch 
-                        value={notificationsEnabled} 
-                        onValueChange={handleToggleNotifications} 
-                        color={THEME.accent} 
-                    />
+                  <Switch 
+                  value={notificationsEnabled} 
+                  onValueChange={handleToggleNotifications} 
+                  color={THEME.accent} 
+                  />
                 )}
-             />
+                />
           </Surface>
 
           {/* --- SECTION 4: DANGER ZONE --- */}
@@ -241,7 +244,7 @@ export default function ProfileScreen() {
                 descriptionStyle={{ color: THEME.danger + '80' }} // 50% opacity
                 left={(props) => <List.Icon {...props} icon="delete-forever" color={THEME.danger} />}
                 onPress={handleResetLogs}
-             />
+                />
           </Surface>
 
           <Button
@@ -250,7 +253,7 @@ export default function ProfileScreen() {
             style={{ marginTop: 30, borderColor: THEME.textSecondary }}
             icon="logout"
             onPress={handleLogout}
-          >
+            >
             Sign Out
           </Button>
           
@@ -267,6 +270,7 @@ export default function ProfileScreen() {
         </View>
       )}
     </SafeAreaView>
+      </ScreenWrapper>
   );
 }
 

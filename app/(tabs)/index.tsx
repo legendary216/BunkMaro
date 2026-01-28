@@ -30,6 +30,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { supabase } from "../../utils/supabase";
 import { Colors } from "../../constants/theme";
+import ScreenWrapper from '../ScreenWrapper';
 
 // --- THEME CONSTANTS (Dark Mode Focused) ---
 const THEME = {
@@ -513,6 +514,8 @@ export default function HomeScreen() {
 
   return (
     <Provider>
+      <ScreenWrapper onSwipeLeft={() => router.push('/calendar')}>
+
       <SafeAreaView style={[styles.container, { backgroundColor: THEME.bg }]}>
         <ScrollView
           contentContainerStyle={styles.scrollContent}
@@ -550,18 +553,18 @@ export default function HomeScreen() {
                     showsHorizontalScrollIndicator={false}
                     contentContainerStyle={{ paddingHorizontal: 20 }}
                     style={{ marginHorizontal: -20 }}
-                  >
+                    >
                    {subjects.map((sub) => {
-                      const stats = subjectStats[sub.id] || { pct: 100, buffer: 0 };
-                      const { pct, buffer } = stats;
-                      const isDanger = pct < 75;
-                      
-                      return (
-                        <TouchableOpacity 
-                          key={sub.id} 
-                          onPress={() => router.push(`/subject/${sub.id}`)}
-                          activeOpacity={0.8}
-                        >
+                     const stats = subjectStats[sub.id] || { pct: 100, buffer: 0 };
+                     const { pct, buffer } = stats;
+                     const isDanger = pct < 75;
+                     
+                     return (
+                       <TouchableOpacity 
+                       key={sub.id} 
+                       onPress={() => router.push(`/subject/${sub.id}`)}
+                       activeOpacity={0.8}
+                       >
                           <Surface style={[styles.statCard, isDanger && styles.statCardDanger]} elevation={1}>
                               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                                  <View>
@@ -577,7 +580,7 @@ export default function HomeScreen() {
                                         icon={isDanger ? "alert" : "thumb-up"} 
                                         size={18} 
                                         iconColor={isDanger ? THEME.danger : THEME.success} 
-                                     />
+                                        />
                                  </View>
                               </View>
 
@@ -597,7 +600,7 @@ export default function HomeScreen() {
                           </Surface>
                         </TouchableOpacity>
                       );
-                  })}
+                    })}
                   </ScrollView>
                 </View>
               )}
@@ -613,19 +616,19 @@ export default function HomeScreen() {
                         onPress={handleBunkToday} 
                         style={styles.actionChip} 
                         textStyle={{ fontSize: 11, color: THEME.textPrimary }}
-                    >Bunk Today</Chip>
+                        >Bunk Today</Chip>
                     <Chip 
                         icon="beach" 
                         onPress={handleHoliday} 
                         style={styles.actionChip} 
                         textStyle={{ fontSize: 11, color: THEME.textPrimary }}
-                    >Holiday</Chip>
+                        >Holiday</Chip>
                     <Chip 
                         icon="plus" 
                         onPress={() => setExtraModalVisible(true)} 
                         style={styles.actionChip} 
                         textStyle={{ fontSize: 11, color: THEME.textPrimary }}
-                    >Extra</Chip>
+                        >Extra</Chip>
                 </ScrollView>
               </View>
 
@@ -638,12 +641,12 @@ export default function HomeScreen() {
               ) : (
                 <View style={{ paddingBottom: 40 }}>
                     {todaySlots.map((slot) => (
-                    <ClassCard
-                        key={slot.id}
-                        slot={slot}
-                        log={todayLogs[`${slot.subject_id}_${slot.start_time}`]}
-                        onMark={(status) => markAttendance(slot, status)}
-                    />
+                      <ClassCard
+                      key={slot.id}
+                      slot={slot}
+                      log={todayLogs[`${slot.subject_id}_${slot.start_time}`]}
+                      onMark={(status) => markAttendance(slot, status)}
+                      />
                     ))}
                 </View>
               )}
@@ -657,7 +660,7 @@ export default function HomeScreen() {
             visible={extraModalVisible}
             onDismiss={() => setExtraModalVisible(false)}
             contentContainerStyle={styles.modal}
-          >
+            >
             {/* HEADER */}
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
@@ -675,7 +678,7 @@ export default function HomeScreen() {
             {/* SUBJECT LIST */}
             <ScrollView style={{ maxHeight: 400 }} showsVerticalScrollIndicator={false}>
                 {subjects.map((sub) => (
-                <View key={sub.id} style={styles.subjectRow}>
+                  <View key={sub.id} style={styles.subjectRow}>
                     {/* Subject Name */}
                     <Text 
                         numberOfLines={1} 
@@ -685,8 +688,8 @@ export default function HomeScreen() {
                             fontWeight: '600', 
                             fontSize: 15,
                             marginRight: 10 
-                        }}
-                    >
+                          }}
+                          >
                         {sub.name}
                     </Text>
 
@@ -699,7 +702,7 @@ export default function HomeScreen() {
                             style={{ borderColor: THEME.danger, borderWidth: 1 }}
                             labelStyle={{ marginHorizontal: 10, fontSize: 12 }}
                             onPress={() => handleExtraClass(sub.id, "BUNKED")}
-                        >
+                            >
                         Bunk
                         </Button>
 
@@ -710,7 +713,7 @@ export default function HomeScreen() {
                             textColor="#000" // Black text on Teal looks sharp
                             labelStyle={{ marginHorizontal: 10, fontSize: 12, fontWeight: 'bold' }}
                             onPress={() => handleExtraClass(sub.id, "PRESENT")}
-                        >
+                            >
                         Attend
                         </Button>
                     </View>
@@ -720,6 +723,7 @@ export default function HomeScreen() {
           </Modal>
         </Portal>
       </SafeAreaView>
+</ScreenWrapper>
     </Provider>
   );
 }
@@ -729,7 +733,7 @@ const styles = StyleSheet.create({
   center: { justifyContent: "center", alignItems: "center" },
   scrollContent: { padding: 20 },
   headerContainer: { 
-      flexDirection: 'row', 
+    flexDirection: 'row', 
       justifyContent: 'space-between', 
       alignItems: 'center', 
       marginBottom: 30,

@@ -1,71 +1,88 @@
-import { Stack } from 'expo-router';
-import { PaperProvider, MD3LightTheme as DefaultTheme } from 'react-native-paper';
+import { Stack, useRouter, useSegments } from 'expo-router';
+import { PaperProvider, MD3DarkTheme } from 'react-native-paper';
+import { ThemeProvider, DarkTheme as NavDarkTheme } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
+import { View, ActivityIndicator } from 'react-native';
+import * as SystemUI from 'expo-system-ui'; // <--- 1. IMPORT THIS
 import { Session } from '@supabase/supabase-js';
 
-import { Colors } from '../constants/theme';
 import { supabase } from '../utils/supabase';
 
-// Setup Theme
-const theme = {
-  ...DefaultTheme,
+// --- THEME SETUP ---
+const paperTheme = {
+  ...MD3DarkTheme,
   colors: {
-    ...DefaultTheme.colors,
-    primary: Colors.light.tint,
-    background: Colors.light.background,
-    onSurface: Colors.light.text,
+    ...MD3DarkTheme.colors,
+    primary: '#BB86FC',
+    background: '#121212',
+    card: '#1E1E1E',
+    surface: '#1E1E1E',
+    onSurface: '#E0E0E0',
   },
 };
 
+const navTheme = {
+  ...NavDarkTheme,
+  colors: {
+    ...NavDarkTheme.colors,
+    primary: '#BB86FC',
+    background: '#121212',
+    card: '#1E1E1E',
+    text: '#E0E0E0',
+    border: '#333333',
+  },
+};
+
+// --- 2. PAINT THE NATIVE ROOT BLACK ---
+// This runs before the component even mounts
+SystemUI.setBackgroundColorAsync("#121212");
+
 export default function RootLayout() {
   const [session, setSession] = useState<Session | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [initialized, setInitialized] = useState(false);
+  const router = useRouter();
+  const segments = useSegments();
 
   useEffect(() => {
-    // 1. Check initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setIsLoading(false);
-    });
-
-    // 2. Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
+      setInitialized(true);
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
-  // While checking login status, show nothing or a loading spinner
-  if (isLoading) return null;
+  useEffect(() => {
+    if (!initialized) return;
+    const inAuthGroup = segments[0] === 'auth';
+    if (session && inAuthGroup) {
+      router.replace('/(tabs)');
+    } else if (!session && !inAuthGroup) {
+      router.replace('/auth');
+    }
+  }, [session, initialized, segments]);
 
-  const isLoggedIn = !!session;
+  if (!initialized) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#121212' }}>
+        <ActivityIndicator size="large" color="#BB86FC" />
+      </View>
+    );
+  }
 
   return (
-    <SafeAreaProvider>
-      <PaperProvider theme={theme}>
-        <Stack screenOptions={{ headerShown: false }}>
-          
-          {/* Public: Login Screen 
-              Guard: Only allowed if NOT logged in (!isLoggedIn)
-          */}
-          <Stack.Protected guard={!isLoggedIn}>
-             <Stack.Screen name="auth" />
-          </Stack.Protected>
-
-          {/* Private: App Tabs 
-              Guard: Only allowed if IS logged in (isLoggedIn)
-          */}
-          <Stack.Protected guard={isLoggedIn}>
-             <Stack.Screen name="(tabs)" />
-          </Stack.Protected>
-
-          {/* Fallback for 404s */}
-          {/* <Stack.Screen name="+not-found" /> */}
-        </Stack>
-        <StatusBar style="auto" />
+    // 3. Ensure SafeAreaProvider also has the dark background
+    <SafeAreaProvider style={{ backgroundColor: '#121212' }}>
+      <PaperProvider theme={paperTheme}>
+        <ThemeProvider value={navTheme}>
+          <Stack screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="(tabs)" />
+            <Stack.Screen name="auth" />
+          </Stack>
+          <StatusBar style="light" backgroundColor="#121212" />
+        </ThemeProvider>
       </PaperProvider>
     </SafeAreaProvider>
   );

@@ -6,19 +6,24 @@
     "orientation": "portrait",
     "icon": "./assets/images/run.png",
     "scheme": "bunkmaro",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "dark",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#121212",
         "foregroundImage": "./assets/images/run.png",
         
         "monochromeImage": "./assets/images/run.png"
       },
       "package": "com.varad.bunkmaro",
+      "navigationBar": {
+        "backgroundColor": "#121212",
+        "barStyle": "light-content",
+        "visible": "true"
+      },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "permissions": [

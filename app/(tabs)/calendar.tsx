@@ -4,7 +4,8 @@ import { Text, ActivityIndicator, Divider, Button, IconButton, Avatar, Surface, 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Calendar } from 'react-native-calendars';
 import { supabase } from '../../utils/supabase';
-
+import ScreenWrapper from '../ScreenWrapper';
+import { useRouter } from 'expo-router';
 // --- THEME CONSTANTS ---
 const THEME = {
   bg: '#121212',           
@@ -19,6 +20,7 @@ const THEME = {
 };
 
 export default function CalendarScreen() {
+  const router = useRouter();
   const [selectedDate, setSelectedDate] = useState(new Date().toLocaleDateString('en-CA'));
   const [combinedData, setCombinedData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -279,6 +281,11 @@ export default function CalendarScreen() {
   };
 
   return (
+    <ScreenWrapper 
+        onSwipeRight={() => router.push('/')}       // Go to Dashboard
+        onSwipeLeft={() => router.push('/profile')} // Go to Profile
+    >
+
     <SafeAreaView style={[styles.container, { backgroundColor: THEME.bg }]}>
       <View style={{ padding: 15 }}>
           <Text variant="headlineMedium" style={{ fontWeight: "bold", color: THEME.textPrimary }}>History</Text>
@@ -293,9 +300,9 @@ export default function CalendarScreen() {
           onDayPress={(day: any) => setSelectedDate(day.dateString)}
           markedDates={{
             [selectedDate]: { 
-                selected: true, 
-                selectedColor: THEME.accent, 
-                selectedTextColor: '#000000' 
+              selected: true, 
+              selectedColor: THEME.accent, 
+              selectedTextColor: '#000000' 
             }
           }}
           // CRITICAL: Explicitly set backgrounds to the Dark Hex Code
@@ -315,7 +322,7 @@ export default function CalendarScreen() {
             textMonthFontWeight: 'bold',
             arrowColor: THEME.accent,
           }}
-        />
+          />
       </View>
 
       <Divider style={{ backgroundColor: THEME.divider }} />
@@ -328,7 +335,7 @@ export default function CalendarScreen() {
             </Text>
             
             {!isFuture && (
-                <TouchableOpacity onPress={markWholeDayHoliday}>
+              <TouchableOpacity onPress={markWholeDayHoliday}>
                     <Text style={{ color: '#4FC3F7', fontWeight: 'bold' }}>Set Holiday 🏖️</Text>
                 </TouchableOpacity>
             )}
@@ -338,20 +345,21 @@ export default function CalendarScreen() {
           <ActivityIndicator style={{ marginTop: 20 }} color={THEME.accent} />
         ) : (
           <FlatList
-            data={combinedData}
-            keyExtractor={(item) => item.id.toString() + item.start_time}
-            renderItem={renderItem}
-            contentContainerStyle={{ paddingBottom: 20 }}
-            ListEmptyComponent={
-              <View style={{ alignItems: 'center', marginTop: 40, opacity: 0.5 }}>
+          data={combinedData}
+          keyExtractor={(item) => item.id.toString() + item.start_time}
+          renderItem={renderItem}
+          contentContainerStyle={{ paddingBottom: 20 }}
+          ListEmptyComponent={
+            <View style={{ alignItems: 'center', marginTop: 40, opacity: 0.5 }}>
                 <IconButton icon="calendar-blank" size={50} iconColor={THEME.textSecondary} />
                 <Text style={{ color: THEME.textSecondary }}>No classes on this date.</Text>
               </View>
             }
-          />
-        )}
+            />
+          )}
       </View>
     </SafeAreaView>
+</ScreenWrapper>
   );
 }
 
@@ -360,33 +368,33 @@ const styles = StyleSheet.create({
   listContainer: { flex: 1, padding: 20 },
   
   timelineCard: {
-      backgroundColor: THEME.cardBg,
-      borderRadius: 12,
-      padding: 12,
-      borderWidth: 1,
-      borderColor: '#333'
+    backgroundColor: THEME.cardBg,
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#333'
   },
   
   // Badges
   badgePending: {
-      backgroundColor: '#252525', 
-      borderRadius: 6, 
-      alignSelf: 'flex-start',
-      paddingHorizontal: 8, 
-      paddingVertical: 4
+    backgroundColor: '#252525', 
+    borderRadius: 6, 
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8, 
+    paddingVertical: 4
   },
   badgeTextPending: {
-      color: '#666', 
-      fontWeight: 'bold', 
-      fontSize: 10
+    color: '#666', 
+    fontWeight: 'bold', 
+    fontSize: 10
   },
   badgeNeon: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      borderWidth: 1,
-      borderRadius: 8,
-      paddingHorizontal: 8,
-      paddingVertical: 4,
-      alignSelf: 'flex-start'
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    alignSelf: 'flex-start'
   }
 });
