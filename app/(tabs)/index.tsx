@@ -112,8 +112,13 @@ const ClassCard = ({
                 {slot.subjects?.name}
               </Text>
               <Text variant="bodySmall" style={{ color: THEME.textSecondary }}>
-                {expanded ? "Select an action below" : "Tap to manage"}
-              </Text>
+  {!isMarkable 
+    ? "Status recorded"   // Case 1: Already Marked
+    : expanded 
+      ? "Select an action below" // Case 2: Pending & Open
+      : "Tap to manage"   // Case 3: Pending & Closed
+  }
+</Text>
             </View>
             
             {/* --- NEON OUTLINE BADGE --- */}
