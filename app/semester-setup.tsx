@@ -1,12 +1,21 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, Keyboard, Alert } from 'react-native';
-import { Text, TextInput, Button, Appbar } from 'react-native-paper';
+import { StyleSheet, View, Keyboard, Alert, TouchableOpacity } from 'react-native';
+import { Text, TextInput, Button, Appbar, IconButton } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { DateTimePickerAndroid, DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { useRouter } from 'expo-router';
 
 import { supabase } from '../utils/supabase';
-import { Colors } from '../constants/theme';
+
+// --- THEME CONSTANTS ---
+const THEME = {
+  bg: '#121212',           
+  cardBg: '#1E1E1E',       
+  textPrimary: '#E0E0E0',  
+  textSecondary: '#A0A0A0',
+  accent: '#BB86FC',       
+  divider: '#333',      
+};
 
 export default function SemesterSetupScreen() {
   const router = useRouter();
@@ -63,9 +72,8 @@ export default function SemesterSetupScreen() {
 
       if (error) throw error;
 
-      Alert.alert('Success', 'Semester created!', [
-        { text: 'OK', onPress: () => router.replace('/(tabs)') }
-      ]);
+      // Navigate to Dashboard
+      router.replace('/(tabs)');
 
     } catch (error: any) {
       Alert.alert('Error', error.message);
@@ -75,51 +83,68 @@ export default function SemesterSetupScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: Colors.light.background }]}>
-      <Appbar.Header style={{ backgroundColor: 'transparent' }}>
-        <Appbar.BackAction onPress={() => router.back()} />
-        <Appbar.Content title="New Semester" />
-      </Appbar.Header>
+    <SafeAreaView style={[styles.container, { backgroundColor: THEME.bg }]}>
+      
+      {/* --- HEADER --- */}
+      <View style={styles.header}>
+        <IconButton icon="arrow-left" iconColor={THEME.textPrimary} size={24} onPress={() => router.back()} />
+        <Text variant="titleLarge" style={{ fontWeight: "bold", color: THEME.textPrimary }}>
+          New Semester
+        </Text>
+        <View style={{ width: 48 }} /> 
+      </View>
 
       <View style={styles.content}>
-        <Text style={styles.label}>What semester is this?</Text>
+        
+        {/* Helper Text */}
+        <Text style={styles.helperText}>
+            Give your new semester a name to start tracking attendance fresh.
+        </Text>
+
+        <Text style={styles.label}>Semester Name</Text>
         <TextInput
-          label="Semester Name"
-          placeholder="e.g. Sem 6"
+          placeholder="e.g. Semester 6"
+          placeholderTextColor={THEME.textSecondary}
           value={name}
           onChangeText={setName}
           mode="outlined"
           style={styles.input}
-          activeOutlineColor={Colors.light.tint}
+          textColor={THEME.textPrimary}
+          outlineColor={THEME.divider}
+          activeOutlineColor={THEME.accent}
+          theme={{ colors: { background: THEME.cardBg, onSurfaceVariant: THEME.textSecondary } }}
         />
 
-        <Text style={styles.label}>When does it start?</Text>
+        <Text style={styles.label}>Start Date</Text>
         
         {/* Android Date Input Trigger */}
         <View>
             <TextInput
-            label="Start Date"
             value={date.toLocaleDateString()}
             mode="outlined"
             editable={false}
-            right={<TextInput.Icon icon="calendar" onPress={showDatepicker} />}
             style={styles.input}
+            textColor={THEME.textPrimary}
+            outlineColor={THEME.divider}
+            theme={{ colors: { background: THEME.cardBg, onSurfaceVariant: THEME.textSecondary } }}
+            right={<TextInput.Icon icon="calendar" color={THEME.accent} onPress={showDatepicker} />}
             />
             {/* Invisible button to catch clicks over the input */}
-            <Button 
+            <TouchableOpacity 
                 style={styles.dateOverlay} 
                 onPress={showDatepicker}
-            >
-                Pick Date
-            </Button>
+            />
         </View>
 
         <Button
           mode="contained"
           onPress={handleCreate}
           loading={loading}
-          style={[styles.button, { backgroundColor: Colors.light.tint }]}
-          contentStyle={{ paddingVertical: 8 }}
+          style={styles.button}
+          contentStyle={{ paddingVertical: 6 }}
+          buttonColor={THEME.accent}
+          textColor="#000000" // Black text on Purple button
+          labelStyle={{ fontWeight: 'bold', fontSize: 16 }}
         >
           Start Semester
         </Button>
@@ -132,25 +157,40 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 10,
+    marginBottom: 10,
+  },
   content: {
     padding: 24,
   },
+  helperText: {
+      color: THEME.textSecondary,
+      marginBottom: 30,
+      fontSize: 14,
+      lineHeight: 20
+  },
   label: {
     marginBottom: 8,
-    opacity: 0.7,
+    color: THEME.textSecondary,
+    fontWeight: 'bold',
+    fontSize: 12,
+    textTransform: 'uppercase',
+    letterSpacing: 1
   },
   input: {
     marginBottom: 24,
-    backgroundColor: 'white',
+    backgroundColor: THEME.cardBg,
   },
   dateOverlay: {
     position: 'absolute',
-    top: 0, left: 0, right: 0, bottom: 0,
-    height: '100%',
-    opacity: 0,
+    top: 0, left: 0, right: 0, bottom: 24, // bottom matches input margin
   },
   button: {
-    marginTop: 10,
-    borderRadius: 8,
+    marginTop: 20,
+    borderRadius: 12,
   }
 });
