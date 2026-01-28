@@ -39,6 +39,14 @@ export default function TabLayout() {
         }}
       />
 
+      <Tabs.Screen
+        name="calendar"
+        options={{
+          title: 'History',
+          tabBarIcon: ({ color }) => <TabBarIcon name="calendar" color={color} />,
+        }}
+      />
+
       {/* 2. Profile Tab (New) */}
       <Tabs.Screen
         name="profile"
