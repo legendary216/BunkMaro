@@ -2,21 +2,34 @@ import React, { useEffect, useState } from "react";
 import { StyleSheet, View, FlatList, Alert, ScrollView } from "react-native";
 import {
   Text,
-  Card,
   ActivityIndicator,
   List,
-  Appbar,
   Modal,
   Portal,
   Provider,
   Button,
   Divider,
+  Surface,
+  IconButton,
+  Avatar
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 
 import { supabase } from "../utils/supabase";
-import { Colors } from "../constants/theme";
+
+// --- THEME CONSTANTS ---
+const THEME = {
+  bg: '#121212',           
+  cardBg: '#1E1E1E',       
+  textPrimary: '#E0E0E0',  
+  textSecondary: '#A0A0A0',
+  accent: '#BB86FC',       
+  divider: '#333',      
+  success: '#03DAC6',      
+  danger: '#CF6679',       
+  warning: '#FFB74D',      
+};
 
 export default function ArchivedSemestersScreen() {
   const router = useRouter();
@@ -35,16 +48,14 @@ export default function ArchivedSemestersScreen() {
 
   async function fetchArchives() {
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
       const { data } = await supabase
         .from("semesters")
         .select("*")
         .eq("user_id", user.id)
-        .eq("is_active", false) // Only inactive ones
+        .eq("is_active", false) 
         .order("created_at", { ascending: false });
 
       if (data) setSemesters(data);
@@ -62,27 +73,12 @@ export default function ArchivedSemestersScreen() {
     setReportLoading(true);
 
     try {
-      // 1. Get Subjects
-      const { data: subjects } = await supabase
-        .from("subjects")
-        .select("id, name")
-        .eq("semester_id", sem.id);
+      const { data: subjects } = await supabase.from("subjects").select("id, name").eq("semester_id", sem.id);
+      const { data: logs } = await supabase.from("attendance_logs").select("*").eq("semester_id", sem.id);
 
-      // 2. Get Logs
-      const { data: logs } = await supabase
-        .from("attendance_logs")
-        .select("*")
-        .eq("semester_id", sem.id);
-
-      // 3. Calculate Scores
       const report = (subjects || []).map((sub) => {
-        const subLogs =
-          logs?.filter(
-            (l) =>
-              l.subject_id === sub.id &&
-              l.status !== "CANCELLED" &&
-              l.status !== "POSTPONED"&&
-               l.status !== "HOLIDAY",
+        const subLogs = logs?.filter(
+            (l) => l.subject_id === sub.id && l.status !== "CANCELLED" && l.status !== "POSTPONED" && l.status !== "HOLIDAY"
           ) || [];
         const total = subLogs.length;
         const present = subLogs.filter((l) => l.status === "PRESENT").length;
@@ -98,35 +94,27 @@ export default function ArchivedSemestersScreen() {
     }
   }
 
-  // Restore Logic (Swap active semester)
   async function handleRestore() {
     Alert.alert(
       "Restore Semester?",
       "This will archive your CURRENT semester and make this one active.",
       [
-        { text: "Cancel" },
+        { text: "Cancel", style: 'cancel' },
         {
           text: "Restore",
+          style: 'default',
           onPress: async () => {
-            const {
-              data: { user },
-            } = await supabase.auth.getUser();
+            const { data: { user } } = await supabase.auth.getUser();
             if (!user) return;
 
             // 1. Archive everything
-            await supabase
-              .from("semesters")
-              .update({ is_active: false })
-              .eq("user_id", user.id);
+            await supabase.from("semesters").update({ is_active: false }).eq("user_id", user.id);
 
             // 2. Activate this one
-            await supabase
-              .from("semesters")
-              .update({ is_active: true })
-              .eq("id", selectedSem.id);
+            await supabase.from("semesters").update({ is_active: true }).eq("id", selectedSem.id);
 
             setVisible(false);
-            router.replace("/(tabs)"); // Go to dashboard
+            router.replace("/(tabs)"); 
           },
         },
       ],
@@ -135,17 +123,20 @@ export default function ArchivedSemestersScreen() {
 
   return (
     <Provider>
-      <SafeAreaView
-        style={[styles.container, { backgroundColor: Colors.light.background }]}
-      >
-        <Appbar.Header style={{ backgroundColor: "transparent" }}>
-          <Appbar.BackAction onPress={() => router.back()} />
-          <Appbar.Content title="Past Semesters" />
-        </Appbar.Header>
+      <SafeAreaView style={[styles.container, { backgroundColor: THEME.bg }]}>
+        
+        {/* --- HEADER --- */}
+        <View style={styles.header}>
+            <IconButton icon="arrow-left" iconColor={THEME.textPrimary} size={24} onPress={() => router.back()} />
+            <Text variant="titleLarge" style={{ fontWeight: "bold", color: THEME.textPrimary }}>
+              Archive Vault
+            </Text>
+            <View style={{ width: 48 }} /> 
+        </View>
 
         {loading ? (
           <View style={styles.center}>
-            <ActivityIndicator />
+            <ActivityIndicator size="large" color={THEME.accent} />
           </View>
         ) : (
           <FlatList
@@ -153,28 +144,38 @@ export default function ArchivedSemestersScreen() {
             keyExtractor={(item) => item.id.toString()}
             contentContainerStyle={{ padding: 20 }}
             renderItem={({ item }) => (
-              <Card style={styles.card} onPress={() => openReportCard(item)}>
-                <Card.Title
-                  title={item.name}
-                  subtitle={`Ended: ${new Date(item.end_date || item.created_at).toLocaleDateString()}`}
-                  left={(props) => <List.Icon {...props} icon="archive" />}
-                  right={(props) => (
-                    <List.Icon {...props} icon="chevron-right" />
-                  )}
-                />
-              </Card>
+              <Surface style={styles.card} elevation={1} onTouchEnd={() => openReportCard(item)}>
+                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <Avatar.Icon 
+                            size={40} 
+                            icon="archive" 
+                            style={{ backgroundColor: '#2A2A2A' }} 
+                            color={THEME.textSecondary} 
+                        />
+                        <View style={{ marginLeft: 15 }}>
+                            <Text variant="titleMedium" style={{ fontWeight: 'bold', color: THEME.textPrimary }}>
+                                {item.name}
+                            </Text>
+                            <Text variant="bodySmall" style={{ color: THEME.textSecondary }}>
+                                Ended: {new Date(item.end_date || item.created_at).toLocaleDateString()}
+                            </Text>
+                        </View>
+                    </View>
+                    <List.Icon icon="chevron-right" color={THEME.textSecondary} />
+                 </View>
+              </Surface>
             )}
             ListEmptyComponent={
-              <Text
-                style={{ textAlign: "center", marginTop: 50, opacity: 0.5 }}
-              >
-                No archived semesters.
-              </Text>
+              <View style={{ alignItems: 'center', marginTop: 50, opacity: 0.5 }}>
+                <IconButton icon="archive-off" size={60} iconColor={THEME.textSecondary} />
+                <Text style={{ color: THEME.textSecondary, marginTop: 10 }}>No archived semesters found.</Text>
+              </View>
             }
           />
         )}
 
-        {/* REPORT CARD MODAL */}
+        {/* --- REPORT CARD MODAL --- */}
         <Portal>
           <Modal
             visible={visible}
@@ -182,41 +183,52 @@ export default function ArchivedSemestersScreen() {
             contentContainerStyle={styles.modal}
           >
             {reportLoading ? (
-              <ActivityIndicator />
+              <ActivityIndicator color={THEME.accent} />
             ) : (
               <View>
-                <Text
-                  variant="headlineSmall"
-                  style={{ fontWeight: "bold", marginBottom: 5 }}
-                >
-                  {selectedSem?.name}
-                </Text>
-                <Text style={{ color: "#666", marginBottom: 20 }}>
-                  Final Report Card
-                </Text>
-
-                <ScrollView style={{ maxHeight: 300 }}>
-                  {reportCard.map((item, index) => (
-                    <View key={index}>
-                      <View
-                        style={{
-                          flexDirection: "row",
-                          justifyContent: "space-between",
-                          paddingVertical: 10,
-                        }}
-                      >
-                        <Text variant="bodyLarge">{item.name}</Text>
-                        <Text
-                          variant="bodyLarge"
-                          style={{
-                            fontWeight: "bold",
-                            color: item.pct < 75 ? "red" : "green",
-                          }}
-                        >
-                          {item.pct}%
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                     <View>
+                        <Text variant="headlineSmall" style={{ fontWeight: "bold", color: THEME.textPrimary }}>
+                        {selectedSem?.name}
                         </Text>
-                      </View>
-                      <Divider />
+                        <Text style={{ color: THEME.textSecondary }}>Final Report Card</Text>
+                     </View>
+                     <IconButton icon="close" iconColor={THEME.textSecondary} onPress={() => setVisible(false)} />
+                </View>
+
+                <Divider style={{ backgroundColor: THEME.divider, marginBottom: 15 }} />
+
+               <ScrollView style={{ maxHeight: 300 }}>
+                  {reportCard.map((item, index) => (
+                    <View key={index} style={styles.reportRow}>
+                        {/* FIX: 
+                           1. flex: 1 -> Takes available width but respects the badge's space
+                           2. numberOfLines={1} -> Cuts off text if too long
+                           3. marginRight: 10 -> Adds safety gap
+                        */}
+                        <Text 
+                            variant="bodyLarge" 
+                            style={{ color: THEME.textPrimary, flex: 1, marginRight: 10 }} 
+                            numberOfLines={1} 
+                            ellipsizeMode="tail"
+                        >
+                            {item.name}
+                        </Text>
+                        
+                        {/* Percentage Badge (Fixed Width container optional, but usually not needed if Flex is on text) */}
+                        <View style={{ 
+                            backgroundColor: item.pct < 75 ? THEME.danger + '20' : THEME.success + '20',
+                            paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8,
+                            minWidth: 50, // Ensures badge doesn't shrink too much
+                            alignItems: 'center'
+                        }}>
+                            <Text style={{ 
+                                fontWeight: "bold", 
+                                color: item.pct < 75 ? THEME.danger : THEME.success 
+                            }}>
+                                {item.pct}%
+                            </Text>
+                        </View>
                     </View>
                   ))}
                 </ScrollView>
@@ -224,17 +236,12 @@ export default function ArchivedSemestersScreen() {
                 <Button
                   mode="contained"
                   onPress={handleRestore}
-                  style={{ marginTop: 20 }}
-                  buttonColor={Colors.light.tint}
+                  style={{ marginTop: 25 }}
+                  buttonColor={THEME.accent}
+                  textColor="#000"
+                  icon="backup-restore"
                 >
                   Restore as Active
-                </Button>
-                <Button
-                  mode="text"
-                  onPress={() => setVisible(false)}
-                  style={{ marginTop: 10 }}
-                >
-                  Close
                 </Button>
               </View>
             )}
@@ -247,12 +254,38 @@ export default function ArchivedSemestersScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  center: { flex: 1, justifyContent: "center", alignItems: "center" },
-  card: { marginBottom: 10, backgroundColor: "white" },
-  modal: {
-    backgroundColor: "white",
-    padding: 20,
-    margin: 20,
-    borderRadius: 10,
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 10,
+    marginBottom: 10,
   },
+  center: { flex: 1, justifyContent: "center", alignItems: "center" },
+  
+  card: { 
+      backgroundColor: THEME.cardBg, 
+      marginBottom: 12, 
+      borderRadius: 12,
+      overflow: 'hidden'
+  },
+  
+  modal: {
+    backgroundColor: THEME.cardBg,
+    padding: 24,
+    margin: 20,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: '#333',
+    elevation: 10
+  },
+  
+  reportRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      paddingVertical: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: '#2A2A2A'
+  }
 });
