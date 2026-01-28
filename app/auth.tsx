@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { Alert, StyleSheet, View, Keyboard, Image } from 'react-native';
-import { Button, Text, TextInput, Surface, ActivityIndicator, IconButton } from 'react-native-paper';
-import { supabase } from '../utils/supabase'; // Adjust path if needed
+import { Alert, StyleSheet, View, Keyboard, Platform, KeyboardAvoidingView } from 'react-native'; // <--- 1. ADD IMPORTS
+import { Button, Text, TextInput, Surface, IconButton } from 'react-native-paper';
+import { supabase } from '../utils/supabase'; 
 import { handleSupabaseError } from '../utils/errorHandler';
-// --- THEME CONSTANTS ---
+
 const THEME = {
   bg: '#121212',           
   cardBg: '#1E1E1E',       
@@ -19,40 +19,31 @@ export default function AuthScreen() {
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState<'request' | 'verify'>('request');
 
-  // Step 1: Send (or Resend) the OTP
   async function signInWithOtp() {
     if (!email) {
       Alert.alert("Validation", "Please enter your email first.");
       return;
     }
-    
     setLoading(true);
     Keyboard.dismiss(); 
 
     try {
-      const { error } = await supabase.auth.signInWithOtp({
-        email: email,
-      });
-
+      const { error } = await supabase.auth.signInWithOtp({ email });
       if (error) throw error;
-
       setStep('verify');
-      Alert.alert('Code Sent!', 'Check your email (and spam folder) for the 8-digit code.');
+      Alert.alert('Code Sent!', 'Check your email for the code.');
     } catch (error: any) {
-      handleSupabaseError(error, "Could not fetch schedule");
-      //Alert.alert('Error Sending Code', error.message);
+      handleSupabaseError(error, "Could not send code");
     } finally {
       setLoading(false);
     }
   }
 
-  // Step 2: Verify the Code
   async function verifyOtp() {
-    if (!otp || otp.length < 8) {
+    if (!otp || otp.length < 6) {
       Alert.alert("Validation", "Please enter the full code.");
       return;
     }
-
     setLoading(true);
     Keyboard.dismiss();
 
@@ -62,138 +53,138 @@ export default function AuthScreen() {
         token: otp,
         type: 'email',
       });
-
       if (error) throw error;
-      
-      // Supabase auto-updates session -> RootLayout redirects automatically
-
     } catch (error: any) {
-      handleSupabaseError(error, "Could not fetch schedule");
-      //Alert.alert('Login Failed', error.message);
+      handleSupabaseError(error, "Login Failed");
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: THEME.bg }]}>
-      
-      {/* --- BRANDING SECTION --- */}
-      <View style={styles.brandSection}>
-        {/* You can replace this icon with your app logo later */}
-        <IconButton icon="ghost" iconColor={THEME.accent} size={60} style={{ margin: 0 }} />
-        <Text variant="displaySmall" style={{ fontWeight: 'bold', color: THEME.textPrimary, letterSpacing: 1 }}>
-            Bunk<Text style={{ color: THEME.accent }}>Maro</Text>
-        </Text>
-        <Text style={{ color: THEME.textSecondary, marginTop: 5, letterSpacing: 1 }}>
-            ATTENDANCE TRACKER
-        </Text>
-      </View>
-
-      {/* --- FORM SECTION --- */}
-      <Surface style={styles.card} elevation={2}>
-          
-          <Text variant="titleLarge" style={{ fontWeight: 'bold', color: THEME.textPrimary, marginBottom: 5, textAlign: 'center' }}>
-            {step === 'request' ? 'Welcome Back' : 'Verify Identity'}
+    // --- 2. WRAP EVERYTHING IN KEYBOARD AVOIDING VIEW ---
+    <KeyboardAvoidingView 
+      style={{ flex: 1 }} 
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
+      <View style={[styles.container, { backgroundColor: THEME.bg }]}>
+        
+        {/* --- BRANDING SECTION --- */}
+        <View style={styles.brandSection}>
+          <IconButton icon="ghost" iconColor={THEME.accent} size={60} style={{ margin: 0 }} />
+          <Text variant="displaySmall" style={{ fontWeight: 'bold', color: THEME.textPrimary, letterSpacing: 1 }}>
+              Bunk<Text style={{ color: THEME.accent }}>Maro</Text>
           </Text>
-          
-          <Text style={{ color: THEME.textSecondary, marginBottom: 25, textAlign: 'center', fontSize: 13 }}>
-            {step === 'request' 
-              ? 'Enter your email to get a login code.' 
-              : `Enter the code sent to ${email}`}
+          <Text style={{ color: THEME.textSecondary, marginTop: 5, letterSpacing: 1 }}>
+              ATTENDANCE TRACKER
           </Text>
+        </View>
 
-          {/* --- Step 1: Email Form --- */}
-          {step === 'request' && (
-            <>
-              <TextInput
-                label="Email Address"
-                value={email}
-                onChangeText={setEmail}
-                autoCapitalize="none"
-                keyboardType="email-address"
-                mode="outlined"
-                textColor={THEME.textPrimary}
-                style={styles.input}
-                outlineColor={THEME.divider}
-                activeOutlineColor={THEME.accent}
-                theme={{ colors: { background: THEME.bg, onSurfaceVariant: THEME.textSecondary } }}
-                left={<TextInput.Icon icon="email-outline" color={THEME.textSecondary} />}
-              />
-              
-              <Button
-                mode="contained"
-                onPress={signInWithOtp}
-                loading={loading}
-                disabled={loading}
-                buttonColor={THEME.accent}
-                textColor="#000000"
-                style={styles.button}
-                contentStyle={{ paddingVertical: 5 }}
-                labelStyle={{ fontWeight: 'bold', fontSize: 16 }}
-              >
-                Send Code
-              </Button>
-            </>
-          )}
+        {/* --- FORM SECTION --- */}
+        <Surface style={styles.card} elevation={2}>
+            
+            <Text variant="titleLarge" style={{ fontWeight: 'bold', color: THEME.textPrimary, marginBottom: 5, textAlign: 'center' }}>
+              {step === 'request' ? 'Welcome Back' : 'Verify Identity'}
+            </Text>
+            
+            <Text style={{ color: THEME.textSecondary, marginBottom: 25, textAlign: 'center', fontSize: 13 }}>
+              {step === 'request' 
+                ? 'Enter your email to get a login code.' 
+                : `Enter the code sent to ${email}`}
+            </Text>
 
-          {/* --- Step 2: OTP Form --- */}
-          {step === 'verify' && (
-            <>
-              <TextInput
-                label="8-Digit Code"
-                value={otp}
-                onChangeText={setOtp}
-                keyboardType="number-pad"
-                mode="outlined"
-                textColor={THEME.textPrimary}
-                style={styles.input}
-                outlineColor={THEME.divider}
-                activeOutlineColor={THEME.accent}
-                maxLength={8}
-                theme={{ colors: { background: THEME.bg, onSurfaceVariant: THEME.textSecondary } }}
-                left={<TextInput.Icon icon="lock-outline" color={THEME.textSecondary} />}
-              />
-              
-              <Button
-                mode="contained"
-                onPress={verifyOtp}
-                loading={loading}
-                disabled={loading}
-                buttonColor={THEME.accent}
-                textColor="#000000"
-                style={styles.button}
-                contentStyle={{ paddingVertical: 5 }}
-                labelStyle={{ fontWeight: 'bold', fontSize: 16 }}
-              >
-                Login
-              </Button>
-
-              <View style={styles.footerRow}>
-                <Button 
-                  mode="text" 
-                  compact
-                  onPress={() => setStep('request')} 
-                  textColor={THEME.textSecondary}
-                  labelStyle={{ fontSize: 12 }}
-                >
-                  Change Email
-                </Button>
-                <Button 
-                  mode="text" 
-                  compact
-                  onPress={signInWithOtp} 
-                  textColor={THEME.accent}
+            {/* --- Step 1: Email Form --- */}
+            {step === 'request' && (
+              <>
+                <TextInput
+                  label="Email Address"
+                  value={email}
+                  onChangeText={setEmail}
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                  mode="outlined"
+                  textColor={THEME.textPrimary}
+                  style={styles.input}
+                  outlineColor={THEME.divider}
+                  activeOutlineColor={THEME.accent}
+                  theme={{ colors: { background: THEME.bg, onSurfaceVariant: THEME.textSecondary } }}
+                  left={<TextInput.Icon icon="email-outline" color={THEME.textSecondary} />}
+                />
+                
+                <Button
+                  mode="contained"
+                  onPress={signInWithOtp}
+                  loading={loading}
                   disabled={loading}
-                  labelStyle={{ fontSize: 12 }}
+                  buttonColor={THEME.accent}
+                  textColor="#000000"
+                  style={styles.button}
+                  contentStyle={{ paddingVertical: 5 }}
+                  labelStyle={{ fontWeight: 'bold', fontSize: 16 }}
                 >
-                  Resend Code
+                  Send Code
                 </Button>
-              </View>
-            </>
-          )}
-      </Surface>
-    </View>
+              </>
+            )}
+
+            {/* --- Step 2: OTP Form --- */}
+            {step === 'verify' && (
+              <>
+                <TextInput
+                  label="Code"
+                  value={otp}
+                  onChangeText={setOtp}
+                  keyboardType="number-pad"
+                  mode="outlined"
+                  textColor={THEME.textPrimary}
+                  style={styles.input}
+                  outlineColor={THEME.divider}
+                  activeOutlineColor={THEME.accent}
+                  maxLength={8}
+                  theme={{ colors: { background: THEME.bg, onSurfaceVariant: THEME.textSecondary } }}
+                  left={<TextInput.Icon icon="lock-outline" color={THEME.textSecondary} />}
+                />
+                
+                <Button
+                  mode="contained"
+                  onPress={verifyOtp}
+                  loading={loading}
+                  disabled={loading}
+                  buttonColor={THEME.accent}
+                  textColor="#000000"
+                  style={styles.button}
+                  contentStyle={{ paddingVertical: 5 }}
+                  labelStyle={{ fontWeight: 'bold', fontSize: 16 }}
+                >
+                  Login
+                </Button>
+
+                <View style={styles.footerRow}>
+                  <Button 
+                    mode="text" 
+                    compact
+                    onPress={() => setStep('request')} 
+                    textColor={THEME.textSecondary}
+                    labelStyle={{ fontSize: 12 }}
+                  >
+                    Change Email
+                  </Button>
+                  <Button 
+                    mode="text" 
+                    compact
+                    onPress={signInWithOtp} 
+                    textColor={THEME.accent}
+                    disabled={loading}
+                    labelStyle={{ fontSize: 12 }}
+                  >
+                    Resend Code
+                  </Button>
+                </View>
+              </>
+            )}
+        </Surface>
+      </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -201,7 +192,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 24,
-    justifyContent: 'center',
+    justifyContent: 'center', // Keeps content centered vertically
   },
   brandSection: {
       alignItems: 'center',

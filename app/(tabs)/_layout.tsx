@@ -2,7 +2,7 @@ import React from 'react';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context'; // Import this
-
+import * as Haptics from 'expo-haptics';
 const DARK_THEME = {
   bg: '#121212',           
   tabBarBg: '#1E1E1E',     
@@ -42,7 +42,14 @@ export default function TabLayout() {
             fontWeight: '600',
             fontSize: 10,
         }
-      }}>
+      }}
+      screenListeners={{
+        tabPress: () => {
+          // 2. Trigger Light Impact on every tap
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        },
+      }}
+      >
       
       <Tabs.Screen
         name="index"

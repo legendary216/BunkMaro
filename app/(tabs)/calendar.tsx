@@ -34,11 +34,18 @@ const THEME = {
   warning: "#FFB74D",
 };
 
+// 🛡️ Bulletproof Date Formatter
+const getTodayDateString = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0'); // Months are 0-indexed
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 export default function CalendarScreen() {
   const router = useRouter();
-  const [selectedDate, setSelectedDate] = useState(
-    new Date().toLocaleDateString("en-CA"),
-  );
+  const [selectedDate, setSelectedDate] = useState(getTodayDateString());
   const [combinedData, setCombinedData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -66,7 +73,7 @@ export default function CalendarScreen() {
         setSemesterStart(data.start_date); // Store it
 
         // If today is BEFORE start date, jump to start date
-        const today = new Date().toLocaleDateString("en-CA");
+       const today = getTodayDateString();
         if (data.start_date && today < data.start_date) {
           setSelectedDate(data.start_date);
         }
@@ -265,7 +272,7 @@ export default function CalendarScreen() {
   };
 
   // --- RENDER ITEM ---
-  const todayStr = new Date().toLocaleDateString("en-CA");
+ const todayStr = getTodayDateString();
   const isFuture = selectedDate > todayStr;
 
   // NEW: Check if date is before semester start

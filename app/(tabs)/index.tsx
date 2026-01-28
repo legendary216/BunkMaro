@@ -32,6 +32,7 @@ import { supabase } from "../../utils/supabase";
 import { Colors } from "../../constants/theme";
 import ScreenWrapper from '../ScreenWrapper';
 import { handleSupabaseError } from '../../utils/errorHandler';
+import { getTodayDateString, getDayIndex } from '../../utils/dateHelper';
 
 // --- THEME CONSTANTS (Dark Mode Focused) ---
 const THEME = {
@@ -220,14 +221,13 @@ export default function HomeScreen() {
 
   const [refreshing, setRefreshing] = useState(false);
   const [extraModalVisible, setExtraModalVisible] = useState(false);
-
   // --- CACHE SYSTEM ---
   const CACHE_KEY = 'dashboard_cache_v1';
 
   const saveToCache = async (data: any) => {
     try {
       const cachePacket = {
-        timestamp: new Date().toISOString().split('T')[0],
+        timestamp: getTodayDateString(),
         data: data
       };
       await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(cachePacket));
@@ -242,7 +242,7 @@ export default function HomeScreen() {
       if (!json) return false;
 
       const { timestamp, data } = JSON.parse(json);
-      const todayStr = new Date().toISOString().split('T')[0];
+      const todayStr = getTodayDateString().split('T')[0];
       if (timestamp !== todayStr) return false;
 
       setSemester(data.semester);
@@ -280,7 +280,7 @@ export default function HomeScreen() {
       }
       setSemester(sem);
 
-      const todayIndex = new Date().getDay();
+      const todayIndex = getDayIndex();
       const { data: slots } = await supabase
         .from("timetable_slots")
         .select("*, subjects(name)")
@@ -291,7 +291,7 @@ export default function HomeScreen() {
       const currentSlots = slots || []; 
       setTodaySlots(currentSlots);
 
-      const todayStr = new Date().toISOString().split("T")[0];
+      const todayStr = getTodayDateString();
       const { data: dailyLogs } = await supabase
         .from("attendance_logs")
         .select("*")
@@ -387,7 +387,7 @@ export default function HomeScreen() {
         const { data: { user } } = await supabase.auth.getUser();
         if(!user || !semester) throw new Error("User not found");
 
-        const todayStr = new Date().toISOString().split('T')[0];
+        const todayStr = getTodayDateString();
         const { data, error } = await supabase.from('attendance_logs').insert({
             user_id: user.id, semester_id: semester.id, subject_id: slot.subject_id, 
             date: todayStr, slot_time: slot.start_time, status: status
@@ -409,7 +409,7 @@ export default function HomeScreen() {
         const { data: { user } } = await supabase.auth.getUser();
         if(!user || !semester) throw new Error("No active semester.");
 
-        const todayStr = new Date().toISOString().split('T')[0];
+        const todayStr = getTodayDateString();
         const timeNow = new Date().toLocaleTimeString('en-US', { hour12: false });
 
         const { error } = await supabase.from('attendance_logs').insert({
@@ -438,7 +438,7 @@ export default function HomeScreen() {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user || !semester) throw new Error("Active semester not found.");
 
-            const todayStr = new Date().toISOString().split('T')[0];
+            const todayStr = getTodayDateString();
             const updates = [];
             for (const slot of todaySlots) {
               if (!todayLogs[`${slot.subject_id}_${slot.start_time}`]) {
@@ -479,7 +479,7 @@ export default function HomeScreen() {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user || !semester) throw new Error("Active semester not found.");
 
-            const todayStr = new Date().toISOString().split('T')[0];
+            const todayStr = getTodayDateString();
             const updates = [];
             for (const slot of todaySlots) {
               if (!todayLogs[`${slot.subject_id}_${slot.start_time}`]) {
