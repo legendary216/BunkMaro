@@ -6,6 +6,8 @@ import {
   ScrollView,
   Alert,
   TouchableOpacity,
+  Dimensions,
+  Platform,
 } from "react-native";
 import {
   Text,
@@ -17,6 +19,10 @@ import {
   Provider,
   Modal,
   List,
+  Surface,
+  IconButton,
+  Avatar,
+  Divider,
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect, useRouter } from "expo-router";
@@ -25,7 +31,20 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from "../../utils/supabase";
 import { Colors } from "../../constants/theme";
 
-// ... (ClassCard remains EXACTLY the same, keep it here) ...
+// --- THEME CONSTANTS (Dark Mode Focused) ---
+const THEME = {
+  bg: '#121212',           // True Dark Background
+  cardBg: '#1E1E1E',       // Dark Grey Card
+  textPrimary: '#E0E0E0',  // Soft White
+  textSecondary: '#A0A0A0',// Muted Grey
+  accent: '#BB86FC',       // Purple Accent
+  divider: '#2C2C2C',      // Dark Divider
+  success: '#03DAC6',      // Teal for Success
+  danger: '#CF6679',       // Soft Red for Error
+  warning: '#FFB74D',      // Orange for Warning
+};
+
+// --- COMPONENT: MODERN CLASS CARD ---
 const ClassCard = ({
   slot,
   log,
@@ -45,112 +64,138 @@ const ClassCard = ({
     setLoadingAction(status);
     await onMark(status);
     setLoadingAction(null);
+    setExpanded(false);
   };
 
-  const renderStatusChip = () => {
-    if (!log) return <Chip icon="clock-outline">Pending</Chip>;
-    switch (log.status) {
-      case "PRESENT":
-        return (
-          <Chip
-            icon="check-circle"
-            style={{ backgroundColor: "#e8f5e9" }}
-            textStyle={{ color: "#2e7d32" }}
-          >
-            Present
-          </Chip>
-        );
-      case "BUNKED":
-        return (
-          <Chip
-            icon="close-circle"
-            style={{ backgroundColor: "#ffebee" }}
-            textStyle={{ color: "#d32f2f" }}
-          >
-            Bunked
-          </Chip>
-        );
-      case "POSTPONED":
-        return (
-          <Chip
-            icon="calendar-clock"
-            style={{ backgroundColor: "#fff3e0" }}
-            textStyle={{ color: "#e65100" }}
-          >
-            Postponed
-          </Chip>
-        );
-      case "HOLIDAY":
-        return (
-          <Chip
-            icon="beach"
-            style={{ backgroundColor: "#e0f7fa" }}
-            textStyle={{ color: "#006064" }}
-          >
-            Holiday
-          </Chip>
-        );
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "PRESENT": return THEME.success;
+      case "BUNKED": return THEME.danger;
+      case "HOLIDAY": return "#4FC3F7"; // Light Blue
+      case "POSTPONED": return THEME.warning;
+      default: return "#757575";
+    }
+  };
 
-      default:
-        return <Chip>Unknown</Chip>;
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case "PRESENT": return "check";
+      case "BUNKED": return "close";
+      case "HOLIDAY": return "beach";
+      case "POSTPONED": return "clock-outline";
+      default: return "help";
     }
   };
 
   return (
-    <Card style={styles.classCard} onPress={() => setExpanded(!expanded)}>
-      <Card.Content>
-        <View style={styles.classRow}>
-          <View style={styles.textContainer}>
-            <Text
-              variant="titleMedium"
-              style={{ fontWeight: "bold" }}
-              numberOfLines={expanded ? undefined : 1}
-            >
-              {slot.subjects?.name}
-            </Text>
-            <Text variant="bodySmall" style={{ color: "#666" }}>
-              {slot.start_time.slice(0, 5)} - {slot.end_time.slice(0, 5)}
-            </Text>
-          </View>
-          {renderStatusChip()}
+    <Surface style={styles.timelineCard} elevation={2}>
+      <TouchableOpacity 
+        onPress={() => setExpanded(!expanded)} 
+        activeOpacity={0.8}
+        style={{ flexDirection: 'row', borderRadius: 16, overflow: 'hidden' }}
+      >
+        {/* Left: Time Column */}
+        <View style={styles.timeColumn}>
+          <Text style={styles.timeText}>{slot.start_time.slice(0, 5)}</Text>
+          <View style={styles.timeLine} />
+          <Text style={[styles.timeText, { color: THEME.textSecondary, fontSize: 12 }]}>
+            {slot.end_time.slice(0, 5)}
+          </Text>
         </View>
-        {isMarkable && expanded && (
-          <View>
-            <View style={styles.actionRow}>
-              <Button
-                mode="contained"
-                onPress={() => handlePress("BUNKED")}
-                loading={loadingAction === "BUNKED"}
-                disabled={loadingAction !== null}
-                style={[styles.actionBtn, { backgroundColor: "#ef5350" }]}
+
+        {/* Right: Info Column */}
+        <View style={styles.infoColumn}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <View style={{ flex: 1 }}>
+              <Text variant="titleMedium" style={{ fontWeight: "700", color: THEME.textPrimary, marginBottom: 2 }}>
+                {slot.subjects?.name}
+              </Text>
+              <Text variant="bodySmall" style={{ color: THEME.textSecondary }}>
+                {expanded ? "Select an action below" : "Tap to manage"}
+              </Text>
+            </View>
+            
+            {/* Status Badge */}
+           {log ? (
+              <View style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  borderColor: getStatusColor(log.status),
+                  borderWidth: 1,           // Crisp border
+                  borderRadius: 8,          // Slightly square corners
+                  paddingHorizontal: 8,
+                  paddingVertical: 4,
+                  backgroundColor: 'transparent' // See-through
+              }}>
+                 {/* Using Text Icon instead of IconButton to remove padding */}
+                 <Avatar.Icon 
+                    size={16} 
+                    icon={getStatusIcon(log.status)} 
+                    color={getStatusColor(log.status)} 
+                    style={{ backgroundColor: 'transparent', marginRight: 4 }} 
+                 />
+                 <Text style={{ 
+                     color: getStatusColor(log.status), 
+                     fontWeight: '900', // Extra Bold
+                     fontSize: 10,
+                     letterSpacing: 0.5,
+                     textTransform: 'uppercase' 
+                 }}>
+                    {log.status}
+                 </Text>
+              </View>
+            ) : (
+              // Pending State
+              <View style={{ 
+                  flexDirection: 'row', alignItems: 'center', 
+                  backgroundColor: '#333', borderRadius: 8, 
+                  paddingHorizontal: 8, paddingVertical: 4 
+              }}>
+                 <Text style={{ color: '#888', fontWeight: 'bold', fontSize: 10 }}>PENDING</Text>
+              </View>
+            )}
+          </View>
+
+          {/* Expanded Actions */}
+          {isMarkable && expanded && (
+            <View style={styles.expandedActions}>
+              <Divider style={{ marginVertical: 12, backgroundColor: THEME.divider }} />
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                <Button
+                  mode="outlined"
+                  onPress={() => handlePress("BUNKED")}
+                  loading={loadingAction === "BUNKED"}
+                  style={{ flex: 1, borderColor: THEME.danger }}
+                  textColor={THEME.danger}
+                  icon="bed"
+                >
+                  Bunk
+                </Button>
+                <Button
+                  mode="contained"
+                  onPress={() => handlePress("PRESENT")}
+                  loading={loadingAction === "PRESENT"}
+                  style={{ flex: 1, backgroundColor: THEME.success }}
+                  textColor="#000" // Black text on Teal looks sharp
+                  icon="check"
+                >
+                  Attend
+                </Button>
+              </View>
+              <Button 
+                mode="text" 
+                compact 
+                textColor={THEME.warning}
+                style={{ marginTop: 8 }} 
+                onPress={() => handlePress("POSTPONED")}
               >
-                Bunk 😈
-              </Button>
-              <Button
-                mode="contained"
-                onPress={() => handlePress("PRESENT")}
-                loading={loadingAction === "PRESENT"}
-                disabled={loadingAction !== null}
-                style={[styles.actionBtn, { backgroundColor: "#66bb6a" }]}
-              >
-                Present 😇
+                Mark as Postponed
               </Button>
             </View>
-            <Button
-              mode="text"
-              textColor="#f57c00"
-              compact
-              onPress={() => handlePress("POSTPONED")}
-              loading={loadingAction === "POSTPONED"}
-              disabled={loadingAction !== null}
-              style={{ marginTop: 5 }}
-            >
-              Lecture Postponed
-            </Button>
-          </View>
-        )}
-      </Card.Content>
-    </Card>
+          )}
+        </View>
+      </TouchableOpacity>
+    </Surface>
   );
 };
 
@@ -161,13 +206,12 @@ export default function HomeScreen() {
   const [semester, setSemester] = useState<any>(null);
 
   const [todaySlots, setTodaySlots] = useState<any[]>([]);
- const [todayLogs, setTodayLogs] = useState<Record<string, any>>({});
+  const [todayLogs, setTodayLogs] = useState<Record<string, any>>({});
   const [subjects, setSubjects] = useState<any[]>([]);
-const [subjectStats, setSubjectStats] = useState<Record<number, { pct: number, buffer: number }>>({});
+  const [subjectStats, setSubjectStats] = useState<Record<number, { pct: number, buffer: number }>>({});
 
   const [refreshing, setRefreshing] = useState(false);
   const [extraModalVisible, setExtraModalVisible] = useState(false);
-
 
   // --- CACHE SYSTEM ---
   const CACHE_KEY = 'dashboard_cache_v1';
@@ -175,7 +219,7 @@ const [subjectStats, setSubjectStats] = useState<Record<number, { pct: number, b
   const saveToCache = async (data: any) => {
     try {
       const cachePacket = {
-        timestamp: new Date().toISOString().split('T')[0], // Store "YYYY-MM-DD"
+        timestamp: new Date().toISOString().split('T')[0],
         data: data
       };
       await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(cachePacket));
@@ -189,24 +233,19 @@ const [subjectStats, setSubjectStats] = useState<Record<number, { pct: number, b
 
       const { timestamp, data } = JSON.parse(json);
       const todayStr = new Date().toISOString().split('T')[0];
-
-      // If cache is from a previous day, discard it (we need fresh slots for today)
       if (timestamp !== todayStr) return false;
 
-      // Restore State immediately
       setSemester(data.semester);
       setSubjects(data.subjects);
       setTodaySlots(data.todaySlots);
       setTodayLogs(data.todayLogs);
       setSubjectStats(data.subjectStats);
       
-      setLoading(false); // Hide spinner immediately
+      setLoading(false);
       return true;
     } catch (e) { return false; }
   };
 
-  // isBackground = true  -> Don't show full screen spinner (for marking attendance/refreshing)
-  // isBackground = false -> Show full screen spinner (for tab switching)
   const fetchDashboardData = async (isBackground = false) => {
     try {
       if (!isBackground) setLoading(true);
@@ -227,11 +266,8 @@ const [subjectStats, setSubjectStats] = useState<Record<number, { pct: number, b
         AsyncStorage.removeItem(CACHE_KEY);
         return;
       }
-      
-      // Update State
       setSemester(sem);
 
-      // --- 1. FETCH TIMETABLE ---
       const todayIndex = new Date().getDay();
       const { data: slots } = await supabase
         .from("timetable_slots")
@@ -240,19 +276,16 @@ const [subjectStats, setSubjectStats] = useState<Record<number, { pct: number, b
         .eq("day_of_week", todayIndex)
         .order("start_time");
       
-      // FIX 1: Create a local variable for immediate use
       const currentSlots = slots || []; 
       setTodaySlots(currentSlots);
 
-      // --- 2. FETCH LOGS ---
       const todayStr = new Date().toISOString().split("T")[0];
       const { data: dailyLogs } = await supabase
         .from("attendance_logs")
         .select("*")
         .eq("date", todayStr);
       
-     const dailyMap: Record<string, any> = {};
-      
+      const dailyMap: Record<string, any> = {};
       if (dailyLogs) {
         dailyLogs.forEach((l) => { 
           const key = `${l.subject_id}_${l.slot_time}`;
@@ -260,15 +293,12 @@ const [subjectStats, setSubjectStats] = useState<Record<number, { pct: number, b
         });
       }
       setTodayLogs(dailyMap);
-      // --- 3. FETCH SUBJECTS & CALCULATE STATS ---
+
       const { data: subData } = await supabase.from("subjects").select("id, name").eq("semester_id", sem.id);
       const subList = subData || [];
-
       const { data: allLogs } = await supabase.from("attendance_logs").select("*").eq("semester_id", sem.id);
 
-      // FIX 2: Restore the "Buffer" Calculation (Object instead of Number)
       const statsMap: Record<number, { pct: number, buffer: number }> = {};
-      
       subList.forEach((s) => {
           const sLogs = allLogs?.filter((l) => 
             l.subject_id === s.id && 
@@ -281,7 +311,6 @@ const [subjectStats, setSubjectStats] = useState<Record<number, { pct: number, b
           const present = sLogs.filter((l) => l.status === "PRESENT").length;
           const pct = total === 0 ? 100 : Math.round((present / total) * 100);
 
-          // Restore Math Logic
           let buffer = 0;
           if (pct >= 75) {
               buffer = Math.floor(((4 * present) / 3) - total);
@@ -293,37 +322,28 @@ const [subjectStats, setSubjectStats] = useState<Record<number, { pct: number, b
       });
       setSubjectStats(statsMap);
 
-      // --- 4. SORTING ---
       const todaysSubjectIds = new Set(currentSlots.map((s) => s.subject_id));
-      
       const sortedSubjects = [...subList].sort((a, b) => {
-          // Fix: Access .pct since statsMap is now an object
           const statA = statsMap[a.id]?.pct ?? 100;
           const statB = statsMap[b.id]?.pct ?? 100;
-          
           const isDangerA = statA < 75;
           const isDangerB = statB < 75;
-
           if (isDangerA && !isDangerB) return -1;
           if (!isDangerA && isDangerB) return 1;
-
           const isTodayA = todaysSubjectIds.has(a.id);
           const isTodayB = todaysSubjectIds.has(b.id);
           if (isTodayA && !isTodayB) return -1;
           if (!isTodayA && isTodayB) return 1;
-
           return a.name.localeCompare(b.name);
       });
       setSubjects(sortedSubjects);
 
-      // --- 5. SAVE TO CACHE ---
-      // FIX 3: Use local variables (currentSlots, dailyMap) instead of state
       saveToCache({
         semester: sem,
-        todaySlots: currentSlots, // Use local var
-        todayLogs: dailyMap,      // Use local var
-        subjects: sortedSubjects, // Use local var
-        subjectStats: statsMap    // Use local var
+        todaySlots: currentSlots,
+        todayLogs: dailyMap,
+        subjects: sortedSubjects,
+        subjectStats: statsMap
       });
 
     } catch (error: any) {
@@ -337,14 +357,9 @@ const [subjectStats, setSubjectStats] = useState<Record<number, { pct: number, b
   useFocusEffect(
     useCallback(() => {
       const init = async () => {
-        // 1. Try to show Cached Data immediately
         const hasCache = await loadFromCache();
-        
-        // 2. Fetch Fresh Data (Silent if cache existed, Loud if not)
-        // If hasCache is true, we pass 'true' (isBackground) so the spinner doesn't show again
         fetchDashboardData(hasCache);
       };
-      
       init();
     }, [])
   );
@@ -354,39 +369,28 @@ const [subjectStats, setSubjectStats] = useState<Record<number, { pct: number, b
     fetchDashboardData();
   };
 
- const markAttendance = async (slot: any, status: string) => {
+  const markAttendance = async (slot: any, status: string) => {
     try {
-        // We don't set global 'setLoading(true)' here because ClassCard has its own spinner.
-        // This prevents the whole screen from flashing white when you mark just one class.
-        
         const { data: { user } } = await supabase.auth.getUser();
         if(!user || !semester) throw new Error("User not found");
 
         const todayStr = new Date().toISOString().split('T')[0];
-        
         const { data, error } = await supabase.from('attendance_logs').insert({
             user_id: user.id, semester_id: semester.id, subject_id: slot.subject_id, 
             date: todayStr, slot_time: slot.start_time, status: status
         }).select().single();
 
         if(error) throw error;
-        
-        // Optimistic Update: Update local state immediately
-       const key = `${slot.subject_id}_${slot.start_time}`;
-setTodayLogs(prev => ({ ...prev, [key]: data }));
-        
-        // Background Refresh (doesn't block UI)
+        const key = `${slot.subject_id}_${slot.start_time}`;
+        setTodayLogs(prev => ({ ...prev, [key]: data }));
         fetchDashboardData(true); 
-
     } catch(e: any) { 
         Alert.alert('Error', e.message);
     }
   };
 
   const handleExtraClass = async (subjectId: number, status: 'PRESENT' | 'BUNKED') => {
-      // 1. START LOADER
       setLoading(true);
-      
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if(!user || !semester) throw new Error("No active semester.");
@@ -395,22 +399,14 @@ setTodayLogs(prev => ({ ...prev, [key]: data }));
         const timeNow = new Date().toLocaleTimeString('en-US', { hour12: false });
 
         const { error } = await supabase.from('attendance_logs').insert({
-            user_id: user.id, 
-            semester_id: semester.id, 
-            subject_id: subjectId, 
-            date: todayStr, 
-            slot_time: timeNow, 
-            status: status
+            user_id: user.id, semester_id: semester.id, subject_id: subjectId, 
+            date: todayStr, slot_time: timeNow, status: status
         });
 
         if (error) throw error;
-
-        // 2. SUCCESS: Close modal and Refresh
         setExtraModalVisible(false);
-        await fetchDashboardData(false); // Refreshes and then turns off spinner
-
+        await fetchDashboardData(false);
       } catch(e: any) {
-        // 3. ERROR
         setLoading(false);
         Alert.alert('Error', e.message);
       }
@@ -422,95 +418,30 @@ setTodayLogs(prev => ({ ...prev, [key]: data }));
       { 
         text: 'Yes, Enjoy! 🏖️', 
         onPress: async () => {
-          // 1. START LOADER (Blocks interaction)
           setLoading(true);
-          
           try {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user || !semester) throw new Error("Active semester not found.");
 
             const todayStr = new Date().toISOString().split('T')[0];
             const updates = [];
-
-            // Loop through today's slots to find pending ones
             for (const slot of todaySlots) {
-              if (!todayLogs[slot.subject_id]) {
+              if (!todayLogs[`${slot.subject_id}_${slot.start_time}`]) {
                 updates.push({
-                  user_id: user.id,
-                  semester_id: semester.id,
-                  subject_id: slot.subject_id,
-                  date: todayStr,
-                  slot_time: slot.start_time,
-                  status: 'HOLIDAY'
+                  user_id: user.id, semester_id: semester.id, subject_id: slot.subject_id,
+                  date: todayStr, slot_time: slot.start_time, status: 'HOLIDAY'
                 });
               }
             }
-
-            if (updates.length > 0) {
-              const { error } = await supabase.from('attendance_logs').insert(updates);
-              if (error) throw error; // Go to catch block if DB fails
-
-              // 2. SUCCESS: Refresh Data (Spinner stays on until this finishes)
-              await fetchDashboardData(false); 
-              Alert.alert('Success', 'Holiday marked! Enjoy your day.');
-            } else {
-              // Nothing to update
-              setLoading(false); 
-              Alert.alert('Info', 'All classes are already marked!');
-            }
-
-          } catch (error: any) {
-            // 3. ERROR HANDLER
-            setLoading(false); // Turn off loader manually
-            Alert.alert('Error', error.message || 'Something went wrong.');
-          }
-        }
-      }
-    ]);
-  };
-
-  const handleBunkToday = () => {
-    Alert.alert('Mass Bunk?', 'This will mark ALL remaining classes today as "BUNKED". Your attendance % will drop.', [
-      { text: 'Cancel', style: 'cancel' },
-      { 
-        text: 'I am sleeping 😴', 
-        style: 'destructive', // Makes the button red on iOS
-        onPress: async () => {
-          setLoading(true); // 1. Start Spinner
-          
-          try {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user || !semester) throw new Error("Active semester not found.");
-
-            const todayStr = new Date().toISOString().split('T')[0];
-            const updates = [];
-
-            // Loop through today's slots
-            for (const slot of todaySlots) {
-              // Only mark if NOT already logged (don't overwrite 'Present' ones)
-              if (!todayLogs[slot.subject_id]) {
-                updates.push({
-                  user_id: user.id,
-                  semester_id: semester.id,
-                  subject_id: slot.subject_id,
-                  date: todayStr,
-                  slot_time: slot.start_time,
-                  status: 'BUNKED' // <--- The key difference
-                });
-              }
-            }
-
             if (updates.length > 0) {
               const { error } = await supabase.from('attendance_logs').insert(updates);
               if (error) throw error;
-
-              await fetchDashboardData(false); // 2. Refresh Data
-              Alert.alert('Done', 'Today marked as Bunked.');
+              await fetchDashboardData(false); 
+              Alert.alert('Success', 'Holiday marked!');
             } else {
-              setLoading(false);
+              setLoading(false); 
               Alert.alert('Info', 'All classes are already marked!');
             }
-
           } catch (error: any) {
             setLoading(false);
             Alert.alert('Error', error.message);
@@ -520,60 +451,103 @@ setTodayLogs(prev => ({ ...prev, [key]: data }));
     ]);
   };
 
+  const handleBunkToday = () => {
+    Alert.alert('BUNK TODAY ?', 'Mark ALL remaining classes as "BUNKED".', [
+      { text: 'Cancel', style: 'cancel' },
+      { 
+        text: 'I am sleeping 😴', 
+        style: 'destructive',
+        onPress: async () => {
+          setLoading(true);
+          try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user || !semester) throw new Error("Active semester not found.");
+
+            const todayStr = new Date().toISOString().split('T')[0];
+            const updates = [];
+            for (const slot of todaySlots) {
+              if (!todayLogs[`${slot.subject_id}_${slot.start_time}`]) {
+                updates.push({
+                  user_id: user.id, semester_id: semester.id, subject_id: slot.subject_id,
+                  date: todayStr, slot_time: slot.start_time, status: 'BUNKED'
+                });
+              }
+            }
+            if (updates.length > 0) {
+              const { error } = await supabase.from('attendance_logs').insert(updates);
+              if (error) throw error;
+              await fetchDashboardData(false);
+              Alert.alert('Done', 'Today marked as Bunked.');
+            } else {
+              setLoading(false);
+              Alert.alert('Info', 'All classes are already marked!');
+            }
+          } catch (error: any) {
+            setLoading(false);
+            Alert.alert('Error', error.message);
+          }
+        }
+      }
+    ]);
+  };
+
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return "Good Morning";
+    if (hour < 18) return "Good Afternoon";
+    return "Good Evening";
+  };
+
   if (loading && !refreshing)
     return (
-      <View style={[styles.center, { flex: 1 }]}>
-        <ActivityIndicator size="large" color={Colors.light.tint} />
+      <View style={[styles.center, { flex: 1, backgroundColor: THEME.bg }]}>
+        <ActivityIndicator size="large" color={THEME.accent} />
       </View>
     );
 
   return (
     <Provider>
-      <SafeAreaView
-        style={[styles.container, { backgroundColor: Colors.light.background }]}
-      >
+      <SafeAreaView style={[styles.container, { backgroundColor: THEME.bg }]}>
         <ScrollView
           contentContainerStyle={styles.scrollContent}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-          }
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={THEME.textPrimary} />}
+          showsVerticalScrollIndicator={false}
         >
-          <View style={styles.header}>
-            <Text variant="headlineMedium" style={{ fontWeight: "bold" }}>
-              Dashboard
-            </Text>
-            <Text variant="bodyLarge" style={{ color: Colors.light.icon }}>
-              {new Date().toDateString()}
-            </Text>
+          {/* --- HEADER --- */}
+          <View style={styles.headerContainer}>
+            <View>
+                <Text variant="titleMedium" style={{ color: THEME.textSecondary }}>{new Date().toDateString()}</Text>
+                <Text variant="headlineMedium" style={{ fontWeight: "800", color: THEME.textPrimary }}>
+                    {getGreeting()}
+                </Text>
+            </View>
+            <Avatar.Icon size={48} icon="account" style={{ backgroundColor: THEME.cardBg }} color={THEME.textPrimary} />
           </View>
 
           {!semester ? (
             <Card style={styles.card}>
               <Card.Content>
-                <Text>No active semester.</Text>
+                <Text style={{color: THEME.textPrimary}}>No active semester found.</Text>
               </Card.Content>
               <Card.Actions>
-                <Button onPress={() => router.push("/semester-setup")}>
-                  Start
-                </Button>
+                <Button onPress={() => router.push("/semester-setup")} textColor={THEME.accent}>Create Semester</Button>
               </Card.Actions>
             </Card>
           ) : (
             <View>
-              {/* SMART SCROLL LIST */}
+              {/* --- SUBJECTS CAROUSEL --- */}
               {subjects.length > 0 && (
-                <View style={{ marginBottom: 20 }}>
+                <View style={{ marginBottom: 25 }}>
+                  <Text variant="titleMedium" style={styles.sectionTitle}>Overview</Text>
                   <ScrollView
                     horizontal
                     showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={{ paddingRight: 20 }}
+                    contentContainerStyle={{ paddingHorizontal: 20 }}
+                    style={{ marginHorizontal: -20 }}
                   >
                    {subjects.map((sub) => {
-                      // 1. EXTRACT DATA SAFELY
-                      // Default to 100% and 0 buffer if data is missing
                       const stats = subjectStats[sub.id] || { pct: 100, buffer: 0 };
                       const { pct, buffer } = stats;
-                      
                       const isDanger = pct < 75;
                       
                       return (
@@ -582,29 +556,39 @@ setTodayLogs(prev => ({ ...prev, [key]: data }));
                           onPress={() => router.push(`/subject/${sub.id}`)}
                           activeOpacity={0.8}
                         >
-                          <Card style={{ marginRight: 12, width: 140, backgroundColor: isDanger ? '#ffebee' : 'white', borderColor: isDanger ? '#ef5350' : 'transparent', borderWidth: isDanger ? 1 : 0 }}>
-                            <Card.Content style={{ alignItems: 'center', paddingVertical: 10 }}>
-                              
-                              {/* PERCENTAGE */}
-                              <Text variant="displaySmall" style={{ fontWeight: 'bold', color: isDanger ? '#d32f2f' : '#2e7d32' }}>
-                                {pct}%
-                              </Text>
-                              
-                              {/* NEW: BUNK ADVICE BADGE */}
-                              <View style={{ 
-                                  backgroundColor: buffer < 0 ? '#ef5350' : '#e8f5e9', 
-                                  paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4, marginTop: 4 
-                              }}>
-                                  <Text style={{ fontSize: 12, fontWeight: 'bold', color: buffer < 0 ? 'white' : '#2e7d32' }}>
-                                      {buffer < 0 ? `Attend ${Math.abs(buffer)}` : `Bunk ${buffer}`}
+                          <Surface style={[styles.statCard, isDanger && styles.statCardDanger]} elevation={1}>
+                              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                 <View>
+                                    <Text variant="displaySmall" style={{ fontWeight: '800', color: isDanger ? THEME.danger : THEME.textPrimary }}>
+                                        {pct}%
+                                    </Text>
+                                    <Text variant="labelSmall" style={{ color: THEME.textSecondary, marginTop: -5 }}>Attendance</Text>
+                                 </View>
+                                 
+                                 {/* Circular Icon */}
+                                 <View style={[styles.iconCircle, { backgroundColor: isDanger ? THEME.danger + '20' : THEME.success + '20' }]}>
+                                     <IconButton 
+                                        icon={isDanger ? "alert" : "thumb-up"} 
+                                        size={18} 
+                                        iconColor={isDanger ? THEME.danger : THEME.success} 
+                                     />
+                                 </View>
+                              </View>
+
+                              {/* Progress Bar Visual */}
+                              <View style={{ height: 4, backgroundColor: '#333', borderRadius: 2, marginVertical: 12, overflow: 'hidden' }}>
+                                  <View style={{ height: '100%', width: `${Math.min(pct, 100)}%`, backgroundColor: isDanger ? THEME.danger : THEME.success }} />
+                              </View>
+
+                              <View>
+                                  <Text variant="titleSmall" numberOfLines={1} style={{ fontWeight: 'bold', color: THEME.textPrimary }}>
+                                    {sub.name}
+                                  </Text>
+                                  <Text style={{ fontSize: 11, fontWeight: '600', color: buffer < 0 ? THEME.danger : THEME.success, marginTop: 4 }}>
+                                      {buffer < 0 ? `Attend next ${Math.abs(buffer)}` : `Safe to bunk ${buffer}`}
                                   </Text>
                               </View>
-                      
-                              <Text variant="labelMedium" numberOfLines={1} style={{ marginTop: 8, fontWeight: isDanger ? 'bold' : 'normal' }}>
-                                {sub.name}
-                              </Text>
-                            </Card.Content>
-                          </Card>
+                          </Surface>
                         </TouchableOpacity>
                       );
                   })}
@@ -612,89 +596,92 @@ setTodayLogs(prev => ({ ...prev, [key]: data }));
                 </View>
               )}
 
-              <View
-                style={{
-                  flexDirection: "row",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                }}
-              >
-                <Text variant="titleLarge" style={styles.sectionTitle}>
-                  Today's Classes
-                </Text>
-
-                <Button mode="text" compact onPress={handleBunkToday} textColor="#ef5350">Bunk Today</Button>
-                <Button
-                  mode="text"
-                  compact
-                  onPress={() => setExtraModalVisible(true)}
-                >
-                  + Extra Class
-                </Button>
-                <Button
-                  mode="text"
-                  compact
-                  onPress={handleHoliday}
-                  textColor="#f57c00"
-                >
-                  Holiday
-                </Button>
-                <Button mode="text" compact onPress={() => setExtraModalVisible(true)}>+ Extra</Button>
+              {/* --- TODAY'S SCHEDULE --- */}
+              <View style={styles.scheduleHeader}>
+                <Text variant="titleMedium" style={styles.sectionTitle}>Today's Schedule</Text>
+                
+                {/* ACTION CHIPS ROW */}
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+                    <Chip 
+                        icon="bed" 
+                        onPress={handleBunkToday} 
+                        style={styles.actionChip} 
+                        textStyle={{ fontSize: 11, color: THEME.textPrimary }}
+                    >Bunk Today</Chip>
+                    <Chip 
+                        icon="beach" 
+                        onPress={handleHoliday} 
+                        style={styles.actionChip} 
+                        textStyle={{ fontSize: 11, color: THEME.textPrimary }}
+                    >Holiday</Chip>
+                    <Chip 
+                        icon="plus" 
+                        onPress={() => setExtraModalVisible(true)} 
+                        style={styles.actionChip} 
+                        textStyle={{ fontSize: 11, color: THEME.textPrimary }}
+                    >Extra</Chip>
+                </ScrollView>
               </View>
 
               {todaySlots.length === 0 ? (
-                <Card style={styles.card}>
-                  <Card.Content>
-                    <Text style={{ textAlign: "center", opacity: 0.6 }}>
-                      No classes scheduled today.
-                    </Text>
-                  </Card.Content>
-                </Card>
+                <View style={styles.emptyState}>
+                  <IconButton icon="calendar-sleep" size={60} iconColor="#444" />
+                  <Text style={{ color: THEME.textSecondary, marginTop: 10 }}>No classes scheduled today.</Text>
+                  <Text style={{ color: "#555", fontSize: 12 }}>Enjoy your free time!</Text>
+                </View>
               ) : (
-                todaySlots.map((slot) => (
-                  <ClassCard
-                    key={slot.id}
-                    slot={slot}
-                    log={todayLogs[`${slot.subject_id}_${slot.start_time}`]}
-                    onMark={(status) => markAttendance(slot, status)}
-                  />
-                ))
+                <View style={{ paddingBottom: 40 }}>
+                    {todaySlots.map((slot) => (
+                    <ClassCard
+                        key={slot.id}
+                        slot={slot}
+                        log={todayLogs[`${slot.subject_id}_${slot.start_time}`]}
+                        onMark={(status) => markAttendance(slot, status)}
+                    />
+                    ))}
+                </View>
               )}
-
-              {/* REMOVED: Manage Buttons are now in Profile */}
             </View>
           )}
         </ScrollView>
 
+        {/* --- EXTRA CLASS MODAL --- */}
         <Portal>
           <Modal
             visible={extraModalVisible}
             onDismiss={() => setExtraModalVisible(false)}
             contentContainerStyle={styles.modal}
           >
-            <Text variant="titleLarge" style={{ marginBottom: 15 }}>
-              Log Extra Class
-            </Text>
-            {subjects.map((sub) => (
-              <List.Item
-                key={sub.id}
-                title={sub.name}
-                right={(props) => (
-                  <View style={{ flexDirection: "row" }}>
-                    <Button onPress={() => handleExtraClass(sub.id, "PRESENT")}>
-                      Present
-                    </Button>
-                    <Button
-                      onPress={() => handleExtraClass(sub.id, "BUNKED")}
-                      textColor="red"
-                    >
-                      Bunk
-                    </Button>
-                  </View>
-                )}
-              />
-            ))}
-            <Button onPress={() => setExtraModalVisible(false)}>Cancel</Button>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 15 }}>
+                <IconButton icon="plus-box" size={24} iconColor={THEME.accent} />
+                <Text variant="titleLarge" style={{ fontWeight: 'bold', color: THEME.textPrimary }}>Log Extra Class</Text>
+            </View>
+            <Divider style={{ marginBottom: 10, backgroundColor: THEME.divider }} />
+            
+            <ScrollView style={{ maxHeight: 300 }}>
+                {subjects.map((sub) => (
+                <List.Item
+                    key={sub.id}
+                    title={sub.name}
+                    titleStyle={{ fontWeight: '600', color: THEME.textPrimary }}
+                    style={{ backgroundColor: THEME.bg, borderRadius: 8, marginBottom: 5 }}
+                    right={(props) => (
+                    <View style={{ flexDirection: "row", alignItems: 'center' }}>
+                        <Button compact mode="text" textColor={THEME.success} onPress={() => handleExtraClass(sub.id, "PRESENT")}>
+                        Present
+                        </Button>
+                        <View style={{ width: 1, height: 15, backgroundColor: '#444', marginHorizontal: 5 }} />
+                        <Button compact mode="text" textColor={THEME.danger} onPress={() => handleExtraClass(sub.id, "BUNKED")}>
+                        Bunk
+                        </Button>
+                    </View>
+                    )}
+                />
+                ))}
+            </ScrollView>
+            <Button mode="contained" buttonColor={THEME.cardBg} style={{ marginTop: 20 }} onPress={() => setExtraModalVisible(false)}>
+                Close
+            </Button>
           </Modal>
         </Portal>
       </SafeAreaView>
@@ -706,27 +693,109 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   center: { justifyContent: "center", alignItems: "center" },
   scrollContent: { padding: 20 },
-  header: { marginBottom: 10 },
-  card: { marginBottom: 16, backgroundColor: "white" },
-  sectionTitle: { fontWeight: "bold", marginBottom: 10, marginTop: 10 },
-  classCard: { marginBottom: 10, backgroundColor: "white" },
-  classRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+  headerContainer: { 
+      flexDirection: 'row', 
+      justifyContent: 'space-between', 
+      alignItems: 'center', 
+      marginBottom: 30,
+      marginTop: 10
   },
-  textContainer: { flex: 1, marginRight: 10 },
-  actionRow: {
-    flexDirection: "row",
-    gap: 10,
-    marginTop: 15,
-    justifyContent: "flex-end",
+  card: { marginBottom: 16, backgroundColor: THEME.cardBg, borderRadius: 12 },
+  sectionTitle: { fontWeight: "800", color: THEME.textPrimary, marginBottom: 15, fontSize: 18 },
+  
+  // STATS CARDS
+  statCard: { 
+      marginRight: 12, 
+      width: 160, // Increased Width slightly
+      height: 160, // Increased Height so it doesn't look squashed
+      backgroundColor: THEME.cardBg, 
+      borderRadius: 16, 
+      padding: 16, // More padding
+      justifyContent: 'space-between'
   },
-  actionBtn: { flex: 1 },
+  statCardDanger: {
+      borderWidth: 1,
+      borderColor: THEME.danger
+  },
+  iconCircle: {
+      width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center', margin: -8
+  },
+
+  // SCHEDULE
+  scheduleHeader: {
+      flexDirection: 'column', 
+      marginBottom: 15, 
+      gap: 10
+  },
+  actionChip: {
+      backgroundColor: THEME.cardBg,
+      borderWidth: 1,
+      borderColor: '#333'
+  },
+  
+  // TIMELINE CARD
+  timelineCard: {
+      marginBottom: 16,
+      backgroundColor: THEME.cardBg,
+      borderRadius: 16,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.2,
+      shadowRadius: 8,
+      elevation: 3,
+  },
+  timeColumn: {
+      width: 60,
+      backgroundColor: '#252525', // Slightly lighter than Card BG
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 15,
+      borderRightWidth: 1,
+      borderRightColor: '#333'
+  },
+  timeText: {
+      fontWeight: 'bold',
+      fontSize: 16,
+      color: THEME.textPrimary
+  },
+  timeLine: {
+      height: 15,
+      width: 2,
+      backgroundColor: '#444',
+      marginVertical: 4,
+      borderRadius: 1
+  },
+  infoColumn: {
+      flex: 1,
+      padding: 15,
+      justifyContent: 'center'
+  },
+  miniBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderRadius: 20,
+      paddingVertical: 2,
+      paddingRight: 0,
+      marginLeft: 5
+  },
+  expandedActions: {
+      marginTop: 5,
+  },
+
+  // EMPTY STATE
+  emptyState: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 40,
+      opacity: 0.8
+  },
+
+  // MODAL
   modal: {
-    backgroundColor: "white",
-    padding: 20,
+    backgroundColor: THEME.cardBg,
+    padding: 25,
     margin: 20,
-    borderRadius: 10,
+    borderRadius: 20,
+    elevation: 5
   },
 });
