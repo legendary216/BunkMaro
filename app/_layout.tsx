@@ -1,25 +1,28 @@
-import { Stack, useRouter, useSegments } from 'expo-router';
-import { PaperProvider, MD3DarkTheme } from 'react-native-paper';
-import { ThemeProvider, DarkTheme as NavDarkTheme } from '@react-navigation/native';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { StatusBar } from 'expo-status-bar';
-import { useEffect, useState } from 'react';
-import { View, ActivityIndicator } from 'react-native';
-import * as SystemUI from 'expo-system-ui'; // <--- 1. IMPORT THIS
-import { Session } from '@supabase/supabase-js';
+import { Stack, useRouter, useSegments } from "expo-router";
+import { PaperProvider, MD3DarkTheme } from "react-native-paper";
+import {
+  ThemeProvider,
+  DarkTheme as NavDarkTheme,
+} from "@react-navigation/native";
+import { SafeAreaProvider } from "react-native-safe-area-context";
+import { StatusBar } from "expo-status-bar";
+import { useEffect, useState } from "react";
+import { View, ActivityIndicator } from "react-native";
+import * as SystemUI from "expo-system-ui"; // <--- 1. IMPORT THIS
+import { Session } from "@supabase/supabase-js";
 
-import { supabase } from '../utils/supabase';
+import { supabase } from "../utils/supabase";
 
 // --- THEME SETUP ---
 const paperTheme = {
   ...MD3DarkTheme,
   colors: {
     ...MD3DarkTheme.colors,
-    primary: '#BB86FC',
-    background: '#121212',
-    card: '#1E1E1E',
-    surface: '#1E1E1E',
-    onSurface: '#E0E0E0',
+    primary: "#BB86FC",
+    background: "#121212",
+    card: "#1E1E1E",
+    surface: "#1E1E1E",
+    onSurface: "#E0E0E0",
   },
 };
 
@@ -27,11 +30,11 @@ const navTheme = {
   ...NavDarkTheme,
   colors: {
     ...NavDarkTheme.colors,
-    primary: '#BB86FC',
-    background: '#121212',
-    card: '#1E1E1E',
-    text: '#E0E0E0',
-    border: '#333333',
+    primary: "#BB86FC",
+    background: "#121212",
+    card: "#1E1E1E",
+    text: "#E0E0E0",
+    border: "#333333",
   },
 };
 
@@ -46,7 +49,9 @@ export default function RootLayout() {
   const segments = useSegments();
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       setInitialized(true);
     });
@@ -56,17 +61,24 @@ export default function RootLayout() {
 
   useEffect(() => {
     if (!initialized) return;
-    const inAuthGroup = segments[0] === 'auth';
+    const inAuthGroup = segments[0] === "auth";
     if (session && inAuthGroup) {
-      router.replace('/(tabs)');
+      router.replace("/(tabs)");
     } else if (!session && !inAuthGroup) {
-      router.replace('/auth');
+      router.replace("/auth");
     }
   }, [session, initialized, segments]);
 
   if (!initialized) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#121212' }}>
+      <View
+        style={{
+          flex: 1,
+          justifyContent: "center",
+          alignItems: "center",
+          backgroundColor: "#121212",
+        }}
+      >
         <ActivityIndicator size="large" color="#BB86FC" />
       </View>
     );
@@ -74,7 +86,7 @@ export default function RootLayout() {
 
   return (
     // 3. Ensure SafeAreaProvider also has the dark background
-    <SafeAreaProvider style={{ backgroundColor: '#121212' }}>
+    <SafeAreaProvider style={{ backgroundColor: "#121212" }}>
       <PaperProvider theme={paperTheme}>
         <ThemeProvider value={navTheme}>
           <Stack screenOptions={{ headerShown: false }}>

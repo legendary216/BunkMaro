@@ -67,7 +67,6 @@ export default function ArchivedSemestersScreen() {
     }
   }
 
-  // Calculate Stats for a specific semester
   async function openReportCard(sem: any) {
     setSelectedSem(sem);
     setVisible(true);
@@ -90,7 +89,6 @@ export default function ArchivedSemestersScreen() {
       setReportCard(report);
     } catch (error) {
       handleSupabaseError(error, "Could not fetch schedule");
-      //Alert.alert("Error", "Could not generate report.");
     } finally {
       setReportLoading(false);
     }
@@ -120,6 +118,41 @@ export default function ArchivedSemestersScreen() {
           },
         },
       ],
+    );
+  }
+
+  // --- NEW DELETE FUNCTION ---
+  async function handleDelete() {
+    Alert.alert(
+      "Delete Forever?",
+      `Are you sure you want to delete "${selectedSem?.name}"? All subjects and logs will be lost.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive", // Shows red on iOS
+          onPress: async () => {
+             setReportLoading(true);
+             try {
+                // Assuming you have 'ON DELETE CASCADE' in your DB, this deletes logs/subjects too
+                const { error } = await supabase
+                    .from('semesters')
+                    .delete()
+                    .eq('id', selectedSem.id);
+
+                if (error) throw error;
+                
+                setVisible(false);
+                fetchArchives(); // Refresh the list
+                // Alert.alert("Deleted", "Semester removed successfully.");
+             } catch (error) {
+                handleSupabaseError(error, "Could not delete semester");
+             } finally {
+                setReportLoading(false);
+             }
+          }
+        }
+      ]
     );
   }
 
@@ -189,13 +222,13 @@ export default function ArchivedSemestersScreen() {
             ) : (
               <View>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-                     <View>
+                      <View>
                         <Text variant="headlineSmall" style={{ fontWeight: "bold", color: THEME.textPrimary }}>
                         {selectedSem?.name}
                         </Text>
                         <Text style={{ color: THEME.textSecondary }}>Final Report Card</Text>
-                     </View>
-                     <IconButton icon="close" iconColor={THEME.textSecondary} onPress={() => setVisible(false)} />
+                      </View>
+                      <IconButton icon="close" iconColor={THEME.textSecondary} onPress={() => setVisible(false)} />
                 </View>
 
                 <Divider style={{ backgroundColor: THEME.divider, marginBottom: 15 }} />
@@ -203,11 +236,6 @@ export default function ArchivedSemestersScreen() {
                <ScrollView style={{ maxHeight: 300 }}>
                   {reportCard.map((item, index) => (
                     <View key={index} style={styles.reportRow}>
-                        {/* FIX: 
-                           1. flex: 1 -> Takes available width but respects the badge's space
-                           2. numberOfLines={1} -> Cuts off text if too long
-                           3. marginRight: 10 -> Adds safety gap
-                        */}
                         <Text 
                             variant="bodyLarge" 
                             style={{ color: THEME.textPrimary, flex: 1, marginRight: 10 }} 
@@ -217,11 +245,10 @@ export default function ArchivedSemestersScreen() {
                             {item.name}
                         </Text>
                         
-                        {/* Percentage Badge (Fixed Width container optional, but usually not needed if Flex is on text) */}
                         <View style={{ 
                             backgroundColor: item.pct < 75 ? THEME.danger + '20' : THEME.success + '20',
                             paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8,
-                            minWidth: 50, // Ensures badge doesn't shrink too much
+                            minWidth: 50, 
                             alignItems: 'center'
                         }}>
                             <Text style={{ 
@@ -245,6 +272,18 @@ export default function ArchivedSemestersScreen() {
                 >
                   Restore as Active
                 </Button>
+
+                {/* --- ADD DELETE BUTTON HERE --- */}
+                <Button
+                  mode="outlined"
+                  onPress={handleDelete}
+                  style={{ marginTop: 10, borderColor: THEME.danger }}
+                  textColor={THEME.danger}
+                  icon="delete"
+                >
+                  Delete Semester
+                </Button>
+
               </View>
             )}
           </Modal>

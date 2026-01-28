@@ -54,50 +54,55 @@ export default function CalendarScreen() {
   const [semesterStart, setSemesterStart] = useState<string | null>(null);
 
   // 1. Get Active Semester & Start Date
-  useEffect(() => {
-    const getSem = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data } = await supabase
-        .from("semesters")
-        .select("id, start_date") // <--- Fetch start_date
-        .eq("user_id", user.id)
-        .eq("is_active", true)
-        .maybeSingle();
-
-      if (data) {
-        setSemesterId(data.id);
-        setSemesterStart(data.start_date); // Store it
-
-        // If today is BEFORE start date, jump to start date
-       const today = getTodayDateString();
-        if (data.start_date && today < data.start_date) {
-          setSelectedDate(data.start_date);
-        }
-      }
-    };
-    getSem();
-  }, []);
-
-  // 2. Fetch Data
- useFocusEffect(
+  
+useFocusEffect(
     useCallback(() => {
-      if (semesterId) {
-        fetchDataForDate(selectedDate);
-      }
-    }, [selectedDate, semesterId]) 
+      const loadPage = async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        // 1. Check for Active Semester FRESH every time
+        const { data: sem } = await supabase
+          .from('semesters')
+          .select('id, start_date')
+          .eq('user_id', user.id)
+          .eq('is_active', true)
+          .maybeSingle();
+
+        if (sem) {
+            // ✅ Active Semester Found: Set state and Fetch
+            setSemesterId(sem.id);
+            setSemesterStart(sem.start_date);
+            // Pass the ID directly so we don't have to wait for state update
+            fetchDataForDate(selectedDate, sem.id); 
+        } else {
+            // ❌ No Active Semester: CLEAR everything
+            setSemesterId(null);
+            setSemesterStart(null);
+            setCombinedData([]); // This clears the list!
+            setLoading(false);
+        }
+      };
+
+      loadPage();
+    }, [selectedDate]) // Only rerun if date changes
   );
-  const fetchDataForDate = async (date: string) => {
+  // 2. Fetch Data
+ 
+  const fetchDataForDate = async (date: string,freshSemId?: any) => {
     setLoading(true);
     try {
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      if (!user || !semesterId) return;
 
+     const targetId = freshSemId || semesterId;
+
+      // FIX: Check targetId instead of semesterId
+      if (!user || !targetId) { 
+        setLoading(false); 
+        return; 
+      }
       const dayIndex = new Date(date + "T12:00:00").getDay();
 
       const { data: slots } = await supabase
