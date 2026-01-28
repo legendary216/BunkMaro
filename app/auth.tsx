@@ -1,8 +1,17 @@
 import React, { useState } from 'react';
-import { Alert, StyleSheet, View, Keyboard } from 'react-native';
-import { Button, Text, TextInput, HelperText } from 'react-native-paper';
-import { supabase } from '../utils/supabase';
-import { Colors } from '../constants/theme';
+import { Alert, StyleSheet, View, Keyboard, Image } from 'react-native';
+import { Button, Text, TextInput, Surface, ActivityIndicator, IconButton } from 'react-native-paper';
+import { supabase } from '../utils/supabase'; // Adjust path if needed
+
+// --- THEME CONSTANTS ---
+const THEME = {
+  bg: '#121212',           
+  cardBg: '#1E1E1E',       
+  textPrimary: '#E0E0E0',  
+  textSecondary: '#A0A0A0',
+  accent: '#BB86FC',       
+  divider: '#333',      
+};
 
 export default function AuthScreen() {
   const [email, setEmail] = useState('');
@@ -18,7 +27,7 @@ export default function AuthScreen() {
     }
     
     setLoading(true);
-    Keyboard.dismiss(); // Close keyboard
+    Keyboard.dismiss(); 
 
     try {
       const { error } = await supabase.auth.signInWithOtp({
@@ -27,9 +36,8 @@ export default function AuthScreen() {
 
       if (error) throw error;
 
-      // Success
       setStep('verify');
-      Alert.alert('Code Sent!', 'Check your email (and spam folder) for the 6-digit code.');
+      Alert.alert('Code Sent!', 'Check your email (and spam folder) for the 8-digit code.');
     } catch (error: any) {
       Alert.alert('Error Sending Code', error.message);
     } finally {
@@ -40,7 +48,7 @@ export default function AuthScreen() {
   // Step 2: Verify the Code
   async function verifyOtp() {
     if (!otp || otp.length < 8) {
-      Alert.alert("Validation", "Please enter the full 8-digit code.");
+      Alert.alert("Validation", "Please enter the full code.");
       return;
     }
 
@@ -48,7 +56,7 @@ export default function AuthScreen() {
     Keyboard.dismiss();
 
     try {
-      const { data, error } = await supabase.auth.verifyOtp({
+      const { error } = await supabase.auth.verifyOtp({
         email,
         token: otp,
         type: 'email',
@@ -56,8 +64,7 @@ export default function AuthScreen() {
 
       if (error) throw error;
       
-      // If we get here, Supabase updates the session automatically.
-      // The _layout.tsx will detect this and switch screens.
+      // Supabase auto-updates session -> RootLayout redirects automatically
 
     } catch (error: any) {
       Alert.alert('Login Failed', error.message);
@@ -67,87 +74,123 @@ export default function AuthScreen() {
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: Colors.light.background }]}>
-      <Text variant="headlineMedium" style={[styles.title, { color: Colors.light.text }]}>
-        {step === 'request' ? 'Bunk Maro' : 'Verify Identity'}
-      </Text>
+    <View style={[styles.container, { backgroundColor: THEME.bg }]}>
       
-      <Text style={[styles.subtitle, { color: Colors.light.icon }]}>
-        {step === 'request' 
-          ? 'Enter your email to get a one-time login code.' 
-          : `We sent a code to ${email}`}
-      </Text>
+      {/* --- BRANDING SECTION --- */}
+      <View style={styles.brandSection}>
+        {/* You can replace this icon with your app logo later */}
+        <IconButton icon="ghost" iconColor={THEME.accent} size={60} style={{ margin: 0 }} />
+        <Text variant="displaySmall" style={{ fontWeight: 'bold', color: THEME.textPrimary, letterSpacing: 1 }}>
+            Bunk<Text style={{ color: THEME.accent }}>Maro</Text>
+        </Text>
+        <Text style={{ color: THEME.textSecondary, marginTop: 5, letterSpacing: 1 }}>
+            ATTENDANCE TRACKER
+        </Text>
+      </View>
 
-      {/* --- Step 1: Email Form --- */}
-      {step === 'request' && (
-        <>
-          <TextInput
-            label="Email Address"
-            value={email}
-            onChangeText={setEmail}
-            autoCapitalize="none"
-            keyboardType="email-address"
-            mode="outlined"
-            style={styles.input}
-            activeOutlineColor={Colors.light.tint}
-          />
-          <Button
-            mode="contained"
-            onPress={signInWithOtp}
-            loading={loading}
-            disabled={loading}
-            buttonColor={Colors.light.tint}
-            style={styles.button}
-          >
-            Send Code
-          </Button>
-        </>
-      )}
-
-      {/* --- Step 2: OTP Form --- */}
-      {step === 'verify' && (
-        <>
-          <TextInput
-            label="8-Digit Code"
-            value={otp}
-            onChangeText={setOtp}
-            keyboardType="number-pad"
-            mode="outlined"
-            style={styles.input}
-            activeOutlineColor={Colors.light.tint}
-            maxLength={8}
-          />
+      {/* --- FORM SECTION --- */}
+      <Surface style={styles.card} elevation={2}>
           
-          <Button
-            mode="contained"
-            onPress={verifyOtp}
-            loading={loading}
-            disabled={loading}
-            buttonColor={Colors.light.tint}
-            style={styles.button}
-          >
-            Verify & Login
-          </Button>
+          <Text variant="titleLarge" style={{ fontWeight: 'bold', color: THEME.textPrimary, marginBottom: 5, textAlign: 'center' }}>
+            {step === 'request' ? 'Welcome Back' : 'Verify Identity'}
+          </Text>
+          
+          <Text style={{ color: THEME.textSecondary, marginBottom: 25, textAlign: 'center', fontSize: 13 }}>
+            {step === 'request' 
+              ? 'Enter your email to get a login code.' 
+              : `Enter the code sent to ${email}`}
+          </Text>
 
-          <View style={styles.row}>
-            <Button 
-              mode="text" 
-              onPress={() => setStep('request')} 
-              textColor={Colors.light.icon}
-            >
-              Change Email
-            </Button>
-            <Button 
-              mode="text" 
-              onPress={signInWithOtp} 
-              textColor={Colors.light.tint}
-              disabled={loading}
-            >
-              Resend Code
-            </Button>
-          </View>
-        </>
-      )}
+          {/* --- Step 1: Email Form --- */}
+          {step === 'request' && (
+            <>
+              <TextInput
+                label="Email Address"
+                value={email}
+                onChangeText={setEmail}
+                autoCapitalize="none"
+                keyboardType="email-address"
+                mode="outlined"
+                textColor={THEME.textPrimary}
+                style={styles.input}
+                outlineColor={THEME.divider}
+                activeOutlineColor={THEME.accent}
+                theme={{ colors: { background: THEME.bg, onSurfaceVariant: THEME.textSecondary } }}
+                left={<TextInput.Icon icon="email-outline" color={THEME.textSecondary} />}
+              />
+              
+              <Button
+                mode="contained"
+                onPress={signInWithOtp}
+                loading={loading}
+                disabled={loading}
+                buttonColor={THEME.accent}
+                textColor="#000000"
+                style={styles.button}
+                contentStyle={{ paddingVertical: 5 }}
+                labelStyle={{ fontWeight: 'bold', fontSize: 16 }}
+              >
+                Send Code
+              </Button>
+            </>
+          )}
+
+          {/* --- Step 2: OTP Form --- */}
+          {step === 'verify' && (
+            <>
+              <TextInput
+                label="8-Digit Code"
+                value={otp}
+                onChangeText={setOtp}
+                keyboardType="number-pad"
+                mode="outlined"
+                textColor={THEME.textPrimary}
+                style={styles.input}
+                outlineColor={THEME.divider}
+                activeOutlineColor={THEME.accent}
+                maxLength={8}
+                theme={{ colors: { background: THEME.bg, onSurfaceVariant: THEME.textSecondary } }}
+                left={<TextInput.Icon icon="lock-outline" color={THEME.textSecondary} />}
+              />
+              
+              <Button
+                mode="contained"
+                onPress={verifyOtp}
+                loading={loading}
+                disabled={loading}
+                buttonColor={THEME.accent}
+                textColor="#000000"
+                style={styles.button}
+                contentStyle={{ paddingVertical: 5 }}
+                labelStyle={{ fontWeight: 'bold', fontSize: 16 }}
+              >
+                Login
+              </Button>
+
+              <View style={styles.footerRow}>
+                <Button 
+                  mode="text" 
+                  compact
+                  onPress={() => setStep('request')} 
+                  textColor={THEME.textSecondary}
+                  labelStyle={{ fontSize: 12 }}
+                >
+                  Change Email
+                </Button>
+                <Button 
+                  mode="text" 
+                  compact
+                  onPress={signInWithOtp} 
+                  textColor={THEME.accent}
+                  disabled={loading}
+                  labelStyle={{ fontSize: 12 }}
+                >
+                  Resend Code
+                </Button>
+              </View>
+            </>
+          )}
+      </Surface>
     </View>
   );
 }
@@ -158,25 +201,28 @@ const styles = StyleSheet.create({
     padding: 24,
     justifyContent: 'center',
   },
-  title: {
-    fontWeight: 'bold',
-    marginBottom: 8,
-    textAlign: 'center',
+  brandSection: {
+      alignItems: 'center',
+      marginBottom: 40,
   },
-  subtitle: {
-    marginBottom: 32,
-    textAlign: 'center',
+  card: {
+      backgroundColor: THEME.cardBg,
+      borderRadius: 20,
+      padding: 24,
+      borderWidth: 1,
+      borderColor: '#333'
   },
   input: {
-    marginBottom: 16,
+    marginBottom: 20,
+    backgroundColor: THEME.bg,
   },
   button: {
-    paddingVertical: 6,
-    borderRadius: 8,
+    borderRadius: 10,
+    marginTop: 5
   },
-  row: {
+  footerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 16,
+    marginTop: 20,
   }
 });
