@@ -4,7 +4,7 @@
     "slug": "BunkMaro",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/run.png",
+    "icon": "./assets/images/ghost.png",
     "scheme": "bunkmaro",
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
@@ -14,9 +14,9 @@
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#121212",
-        "foregroundImage": "./assets/images/run.png",
+        "foregroundImage": "./assets/images/ghost.png",
         
-        "monochromeImage": "./assets/images/run.png"
+        "monochromeImage": "./assets/images/ghost.png"
       },
       "package": "com.varad.bunkmaro",
       "navigationBar": {
@@ -34,14 +34,14 @@
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/run.png"
+      "favicon": "./assets/images/ghost.png"
     },
     "plugins": [
       "expo-router",
       [
         "expo-notifications",
         {
-          "icon": "./assets/images/run.png",
+          "icon": "./assets/images/ghost.png",
           "color": "#ffffff",
           "defaultChannel": "default"
         }
@@ -50,7 +50,7 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/run.png",
+          "image": "./assets/images/ghost.png",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff",
