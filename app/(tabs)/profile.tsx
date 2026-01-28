@@ -10,6 +10,7 @@ import {
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
+import { scheduleDailyReminder, cancelReminders } from '../../utils/notifications';
 
 import { supabase } from "../../utils/supabase";
 import { Colors } from "../../constants/theme";
@@ -191,6 +192,20 @@ const handleLogout = async () => {
           />
 
           <Divider style={{ marginVertical: 20 }} />
+          <Text variant="titleMedium" style={styles.sectionTitle}>App Settings</Text>
+          
+          <List.Item
+            title="Daily Reminder (9 PM)"
+            description="Get notified to mark attendance"
+            left={props => <List.Icon {...props} icon="bell-ring" />}
+            right={props => (
+              <View style={{ flexDirection: 'row' }}>
+                 <Button onPress={scheduleDailyReminder}>On</Button>
+                 <Button onPress={cancelReminders} textColor="#aaa">Off</Button>
+              </View>
+            )}
+            style={styles.listItem}
+          />
 
           <Text variant="titleMedium" style={styles.sectionTitle}>
             Data Zone
