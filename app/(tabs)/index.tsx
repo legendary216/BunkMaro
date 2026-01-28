@@ -161,7 +161,7 @@ export default function HomeScreen() {
   const [semester, setSemester] = useState<any>(null);
 
   const [todaySlots, setTodaySlots] = useState<any[]>([]);
-  const [todayLogs, setTodayLogs] = useState<Record<number, any>>({});
+ const [todayLogs, setTodayLogs] = useState<Record<string, any>>({});
   const [subjects, setSubjects] = useState<any[]>([]);
 const [subjectStats, setSubjectStats] = useState<Record<number, { pct: number, buffer: number }>>({});
 
@@ -251,10 +251,15 @@ const [subjectStats, setSubjectStats] = useState<Record<number, { pct: number, b
         .select("*")
         .eq("date", todayStr);
       
-      const dailyMap: Record<number, any> = {};
-      if (dailyLogs) dailyLogs.forEach((l) => { dailyMap[l.subject_id] = l; });
+     const dailyMap: Record<string, any> = {};
+      
+      if (dailyLogs) {
+        dailyLogs.forEach((l) => { 
+          const key = `${l.subject_id}_${l.slot_time}`;
+          dailyMap[key] = l; 
+        });
+      }
       setTodayLogs(dailyMap);
-
       // --- 3. FETCH SUBJECTS & CALCULATE STATS ---
       const { data: subData } = await supabase.from("subjects").select("id, name").eq("semester_id", sem.id);
       const subList = subData || [];
@@ -367,7 +372,8 @@ const [subjectStats, setSubjectStats] = useState<Record<number, { pct: number, b
         if(error) throw error;
         
         // Optimistic Update: Update local state immediately
-        setTodayLogs(prev => ({ ...prev, [slot.subject_id]: data }));
+       const key = `${slot.subject_id}_${slot.start_time}`;
+setTodayLogs(prev => ({ ...prev, [key]: data }));
         
         // Background Refresh (doesn't block UI)
         fetchDashboardData(true); 
@@ -649,7 +655,7 @@ const [subjectStats, setSubjectStats] = useState<Record<number, { pct: number, b
                   <ClassCard
                     key={slot.id}
                     slot={slot}
-                    log={todayLogs[slot.subject_id]}
+                    log={todayLogs[`${slot.subject_id}_${slot.start_time}`]}
                     onMark={(status) => markAttendance(slot, status)}
                   />
                 ))
