@@ -20,6 +20,7 @@ import {
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect, useRouter } from "expo-router";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { supabase } from "../../utils/supabase";
 import { Colors } from "../../constants/theme";
@@ -162,10 +163,47 @@ export default function HomeScreen() {
   const [todaySlots, setTodaySlots] = useState<any[]>([]);
   const [todayLogs, setTodayLogs] = useState<Record<number, any>>({});
   const [subjects, setSubjects] = useState<any[]>([]);
-  const [subjectStats, setSubjectStats] = useState<Record<number, number>>({});
+const [subjectStats, setSubjectStats] = useState<Record<number, { pct: number, buffer: number }>>({});
 
   const [refreshing, setRefreshing] = useState(false);
   const [extraModalVisible, setExtraModalVisible] = useState(false);
+
+
+  // --- CACHE SYSTEM ---
+  const CACHE_KEY = 'dashboard_cache_v1';
+
+  const saveToCache = async (data: any) => {
+    try {
+      const cachePacket = {
+        timestamp: new Date().toISOString().split('T')[0], // Store "YYYY-MM-DD"
+        data: data
+      };
+      await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(cachePacket));
+    } catch (e) { console.log('Cache Save Failed', e); }
+  };
+
+  const loadFromCache = async () => {
+    try {
+      const json = await AsyncStorage.getItem(CACHE_KEY);
+      if (!json) return false;
+
+      const { timestamp, data } = JSON.parse(json);
+      const todayStr = new Date().toISOString().split('T')[0];
+
+      // If cache is from a previous day, discard it (we need fresh slots for today)
+      if (timestamp !== todayStr) return false;
+
+      // Restore State immediately
+      setSemester(data.semester);
+      setSubjects(data.subjects);
+      setTodaySlots(data.todaySlots);
+      setTodayLogs(data.todayLogs);
+      setSubjectStats(data.subjectStats);
+      
+      setLoading(false); // Hide spinner immediately
+      return true;
+    } catch (e) { return false; }
+  };
 
   // isBackground = true  -> Don't show full screen spinner (for marking attendance/refreshing)
   // isBackground = false -> Show full screen spinner (for tab switching)
@@ -173,9 +211,7 @@ export default function HomeScreen() {
     try {
       if (!isBackground) setLoading(true);
 
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
       const { data: sem } = await supabase
@@ -184,68 +220,82 @@ export default function HomeScreen() {
         .eq("user_id", user.id)
         .eq("is_active", true)
         .maybeSingle();
-      setSemester(sem);
-
+      
       if (!sem) {
         setSemester(null);
         setLoading(false);
+        AsyncStorage.removeItem(CACHE_KEY);
         return;
       }
+      
+      // Update State
+      setSemester(sem);
 
-      if (sem) {
-        const todayIndex = new Date().getDay();
-        const { data: slots } = await supabase
-          .from("timetable_slots")
-          .select("*, subjects(name)")
-          .eq("semester_id", sem.id)
-          .eq("day_of_week", todayIndex)
-          .order("start_time");
-        if (slots) setTodaySlots(slots);
+      // --- 1. FETCH TIMETABLE ---
+      const todayIndex = new Date().getDay();
+      const { data: slots } = await supabase
+        .from("timetable_slots")
+        .select("*, subjects(name)")
+        .eq("semester_id", sem.id)
+        .eq("day_of_week", todayIndex)
+        .order("start_time");
+      
+      // FIX 1: Create a local variable for immediate use
+      const currentSlots = slots || []; 
+      setTodaySlots(currentSlots);
 
-        const todaysSubjectIds = new Set(slots?.map((s) => s.subject_id));
-        const todayStr = new Date().toISOString().split("T")[0];
-        const { data: dailyLogs } = await supabase
-          .from("attendance_logs")
-          .select("*")
-          .eq("date", todayStr);
-        const dailyMap: Record<number, any> = {};
-        if (dailyLogs)
-          dailyLogs.forEach((l) => {
-            dailyMap[l.subject_id] = l;
-          });
-        setTodayLogs(dailyMap);
+      // --- 2. FETCH LOGS ---
+      const todayStr = new Date().toISOString().split("T")[0];
+      const { data: dailyLogs } = await supabase
+        .from("attendance_logs")
+        .select("*")
+        .eq("date", todayStr);
+      
+      const dailyMap: Record<number, any> = {};
+      if (dailyLogs) dailyLogs.forEach((l) => { dailyMap[l.subject_id] = l; });
+      setTodayLogs(dailyMap);
 
-        const { data: subData } = await supabase
-          .from("subjects")
-          .select("id, name")
-          .eq("semester_id", sem.id);
-        const subList = subData || [];
+      // --- 3. FETCH SUBJECTS & CALCULATE STATS ---
+      const { data: subData } = await supabase.from("subjects").select("id, name").eq("semester_id", sem.id);
+      const subList = subData || [];
 
-        const { data: allLogs } = await supabase
-          .from("attendance_logs")
-          .select("*")
-          .eq("semester_id", sem.id);
+      const { data: allLogs } = await supabase.from("attendance_logs").select("*").eq("semester_id", sem.id);
 
-        const statsMap: Record<number, number> = {};
-        subList.forEach((s) => {
-          const sLogs =
-            allLogs?.filter(
-              (l) =>
-                l.subject_id === s.id &&
-                l.status !== "CANCELLED" &&
-                l.status !== "POSTPONED" &&
-                l.status !== "HOLIDAY",
-            ) || [];
+      // FIX 2: Restore the "Buffer" Calculation (Object instead of Number)
+      const statsMap: Record<number, { pct: number, buffer: number }> = {};
+      
+      subList.forEach((s) => {
+          const sLogs = allLogs?.filter((l) => 
+            l.subject_id === s.id && 
+            l.status !== "CANCELLED" && 
+            l.status !== "POSTPONED" && 
+            l.status !== "HOLIDAY"
+          ) || [];
+          
           const total = sLogs.length;
           const present = sLogs.filter((l) => l.status === "PRESENT").length;
-          statsMap[s.id] =
-            total === 0 ? 100 : Math.round((present / total) * 100);
-        });
-        setSubjectStats(statsMap);
+          const pct = total === 0 ? 100 : Math.round((present / total) * 100);
 
-        const sortedSubjects = [...subList].sort((a, b) => {
-          const statA = statsMap[a.id] ?? 100;
-          const statB = statsMap[b.id] ?? 100;
+          // Restore Math Logic
+          let buffer = 0;
+          if (pct >= 75) {
+              buffer = Math.floor(((4 * present) / 3) - total);
+          } else {
+              const needed = (3 * total) - (4 * present);
+              buffer = -Math.max(1, needed);
+          }
+          statsMap[s.id] = { pct, buffer };
+      });
+      setSubjectStats(statsMap);
+
+      // --- 4. SORTING ---
+      const todaysSubjectIds = new Set(currentSlots.map((s) => s.subject_id));
+      
+      const sortedSubjects = [...subList].sort((a, b) => {
+          // Fix: Access .pct since statsMap is now an object
+          const statA = statsMap[a.id]?.pct ?? 100;
+          const statB = statsMap[b.id]?.pct ?? 100;
+          
           const isDangerA = statA < 75;
           const isDangerB = statB < 75;
 
@@ -258,10 +308,19 @@ export default function HomeScreen() {
           if (!isTodayA && isTodayB) return 1;
 
           return a.name.localeCompare(b.name);
-        });
+      });
+      setSubjects(sortedSubjects);
 
-        setSubjects(sortedSubjects);
-      }
+      // --- 5. SAVE TO CACHE ---
+      // FIX 3: Use local variables (currentSlots, dailyMap) instead of state
+      saveToCache({
+        semester: sem,
+        todaySlots: currentSlots, // Use local var
+        todayLogs: dailyMap,      // Use local var
+        subjects: sortedSubjects, // Use local var
+        subjectStats: statsMap    // Use local var
+      });
+
     } catch (error: any) {
       console.log("Error:", error.message);
     } finally {
@@ -272,9 +331,19 @@ export default function HomeScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      fetchDashboardData(false);
-    }, []),
+      const init = async () => {
+        // 1. Try to show Cached Data immediately
+        const hasCache = await loadFromCache();
+        
+        // 2. Fetch Fresh Data (Silent if cache existed, Loud if not)
+        // If hasCache is true, we pass 'true' (isBackground) so the spinner doesn't show again
+        fetchDashboardData(hasCache);
+      };
+      
+      init();
+    }, [])
   );
+
   const onRefresh = () => {
     setRefreshing(true);
     fetchDashboardData();
@@ -493,54 +562,46 @@ export default function HomeScreen() {
                     showsHorizontalScrollIndicator={false}
                     contentContainerStyle={{ paddingRight: 20 }}
                   >
-                    {subjects.map((sub) => {
-                      const pct = subjectStats[sub.id] ?? 100;
+                   {subjects.map((sub) => {
+                      // 1. EXTRACT DATA SAFELY
+                      // Default to 100% and 0 buffer if data is missing
+                      const stats = subjectStats[sub.id] || { pct: 100, buffer: 0 };
+                      const { pct, buffer } = stats;
+                      
                       const isDanger = pct < 75;
+                      
                       return (
-                        <TouchableOpacity
-                          key={sub.id}
+                        <TouchableOpacity 
+                          key={sub.id} 
                           onPress={() => router.push(`/subject/${sub.id}`)}
                           activeOpacity={0.8}
                         >
-                          <Card
-                            style={{
-                              marginRight: 12,
-                              width: 140,
-                              backgroundColor: isDanger ? "#ffebee" : "white",
-                              borderColor: isDanger ? "#ef5350" : "transparent",
-                              borderWidth: isDanger ? 1 : 0,
-                            }}
-                          >
-                            <Card.Content
-                              style={{
-                                alignItems: "center",
-                                paddingVertical: 10,
-                              }}
-                            >
-                              <Text
-                                variant="displaySmall"
-                                style={{
-                                  fontWeight: "bold",
-                                  color: isDanger ? "#d32f2f" : "#2e7d32",
-                                }}
-                              >
+                          <Card style={{ marginRight: 12, width: 140, backgroundColor: isDanger ? '#ffebee' : 'white', borderColor: isDanger ? '#ef5350' : 'transparent', borderWidth: isDanger ? 1 : 0 }}>
+                            <Card.Content style={{ alignItems: 'center', paddingVertical: 10 }}>
+                              
+                              {/* PERCENTAGE */}
+                              <Text variant="displaySmall" style={{ fontWeight: 'bold', color: isDanger ? '#d32f2f' : '#2e7d32' }}>
                                 {pct}%
                               </Text>
-                              <Text
-                                variant="labelMedium"
-                                numberOfLines={1}
-                                style={{
-                                  marginTop: 5,
-                                  fontWeight: isDanger ? "bold" : "normal",
-                                }}
-                              >
+                              
+                              {/* NEW: BUNK ADVICE BADGE */}
+                              <View style={{ 
+                                  backgroundColor: buffer < 0 ? '#ef5350' : '#e8f5e9', 
+                                  paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4, marginTop: 4 
+                              }}>
+                                  <Text style={{ fontSize: 12, fontWeight: 'bold', color: buffer < 0 ? 'white' : '#2e7d32' }}>
+                                      {buffer < 0 ? `Attend ${Math.abs(buffer)}` : `Bunk ${buffer}`}
+                                  </Text>
+                              </View>
+                      
+                              <Text variant="labelMedium" numberOfLines={1} style={{ marginTop: 8, fontWeight: isDanger ? 'bold' : 'normal' }}>
                                 {sub.name}
                               </Text>
                             </Card.Content>
                           </Card>
                         </TouchableOpacity>
                       );
-                    })}
+                  })}
                   </ScrollView>
                 </View>
               )}
