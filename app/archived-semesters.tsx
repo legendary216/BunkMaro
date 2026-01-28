@@ -15,7 +15,7 @@ import {
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-
+import { handleSupabaseError } from '../utils/errorHandler';
 import { supabase } from "../utils/supabase";
 
 // --- THEME CONSTANTS ---
@@ -60,6 +60,7 @@ export default function ArchivedSemestersScreen() {
 
       if (data) setSemesters(data);
     } catch (error) {
+      handleSupabaseError(error, "Could not fetch schedule");
       console.log(error);
     } finally {
       setLoading(false);
@@ -88,7 +89,8 @@ export default function ArchivedSemestersScreen() {
 
       setReportCard(report);
     } catch (error) {
-      Alert.alert("Error", "Could not generate report.");
+      handleSupabaseError(error, "Could not fetch schedule");
+      //Alert.alert("Error", "Could not generate report.");
     } finally {
       setReportLoading(false);
     }

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Alert, StyleSheet, View, Keyboard, Image } from 'react-native';
 import { Button, Text, TextInput, Surface, ActivityIndicator, IconButton } from 'react-native-paper';
 import { supabase } from '../utils/supabase'; // Adjust path if needed
-
+import { handleSupabaseError } from '../utils/errorHandler';
 // --- THEME CONSTANTS ---
 const THEME = {
   bg: '#121212',           
@@ -39,7 +39,8 @@ export default function AuthScreen() {
       setStep('verify');
       Alert.alert('Code Sent!', 'Check your email (and spam folder) for the 8-digit code.');
     } catch (error: any) {
-      Alert.alert('Error Sending Code', error.message);
+      handleSupabaseError(error, "Could not fetch schedule");
+      //Alert.alert('Error Sending Code', error.message);
     } finally {
       setLoading(false);
     }
@@ -67,7 +68,8 @@ export default function AuthScreen() {
       // Supabase auto-updates session -> RootLayout redirects automatically
 
     } catch (error: any) {
-      Alert.alert('Login Failed', error.message);
+      handleSupabaseError(error, "Could not fetch schedule");
+      //Alert.alert('Login Failed', error.message);
     } finally {
       setLoading(false);
     }

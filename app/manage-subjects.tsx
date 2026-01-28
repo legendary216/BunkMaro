@@ -3,7 +3,7 @@ import { StyleSheet, View, FlatList, Keyboard, Alert, TouchableOpacity, Keyboard
 import { Text, TextInput, IconButton, ActivityIndicator, Surface, Button } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-
+import { handleSupabaseError } from '../utils/errorHandler';
 import { supabase } from '../utils/supabase';
 
 // --- THEME CONSTANTS ---
@@ -60,6 +60,7 @@ export default function ManageSubjectsScreen() {
       if (subjectList) setSubjects(subjectList);
 
     } catch (error) {
+      handleSupabaseError(error, "Could not fetch schedule");
       console.log(error);
     } finally{
       setLoading(false);
@@ -88,7 +89,8 @@ export default function ManageSubjectsScreen() {
       setNewSubject('');
 
     } catch (error: any) {
-      Alert.alert('Error', error.message);
+      handleSupabaseError(error, "Could not fetch schedule");
+      //Alert.alert('Error', error.message);
     } finally {
       setAdding(false);
     }

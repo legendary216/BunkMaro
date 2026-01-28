@@ -4,7 +4,7 @@ import { Text, TextInput, Button, Appbar, IconButton } from 'react-native-paper'
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { DateTimePickerAndroid, DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { useRouter } from 'expo-router';
-
+import { handleSupabaseError } from '../utils/errorHandler';
 import { supabase } from '../utils/supabase';
 
 // --- THEME CONSTANTS ---
@@ -76,7 +76,8 @@ export default function SemesterSetupScreen() {
       router.replace('/(tabs)');
 
     } catch (error: any) {
-      Alert.alert('Error', error.message);
+      handleSupabaseError(error, "Could not fetch schedule");
+      //Alert.alert('Error', error.message);
     } finally {
       setLoading(false);
     }

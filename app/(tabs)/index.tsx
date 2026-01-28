@@ -31,6 +31,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from "../../utils/supabase";
 import { Colors } from "../../constants/theme";
 import ScreenWrapper from '../ScreenWrapper';
+import { handleSupabaseError } from '../../utils/errorHandler';
 
 // --- THEME CONSTANTS (Dark Mode Focused) ---
 const THEME = {
@@ -230,7 +231,9 @@ export default function HomeScreen() {
         data: data
       };
       await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(cachePacket));
-    } catch (e) { console.log('Cache Save Failed', e); }
+    } catch (e) {
+      handleSupabaseError(e, "Could not fetch schedule");
+      console.log('Cache Save Failed', e); }
   };
 
   const loadFromCache = async () => {
@@ -250,7 +253,9 @@ export default function HomeScreen() {
       
       setLoading(false);
       return true;
-    } catch (e) { return false; }
+    } catch (e) {
+      handleSupabaseError(e, "Could not fetch schedule"); 
+      return false; }
   };
 
   const fetchDashboardData = async (isBackground = false) => {
@@ -354,6 +359,7 @@ export default function HomeScreen() {
       });
 
     } catch (error: any) {
+      handleSupabaseError(error, "Could not fetch schedule");
       console.log("Error:", error.message);
     } finally {
       setLoading(false);
@@ -392,7 +398,8 @@ export default function HomeScreen() {
         setTodayLogs(prev => ({ ...prev, [key]: data }));
         fetchDashboardData(true); 
     } catch(e: any) { 
-        Alert.alert('Error', e.message);
+      handleSupabaseError(e, "Could not fetch schedule");
+       // Alert.alert('Error', e.message);
     }
   };
 
@@ -414,8 +421,9 @@ export default function HomeScreen() {
         setExtraModalVisible(false);
         await fetchDashboardData(false);
       } catch(e: any) {
+        handleSupabaseError(e, "Could not fetch schedule");
         setLoading(false);
-        Alert.alert('Error', e.message);
+       // Alert.alert('Error', e.message);
       }
   };
 
@@ -450,8 +458,9 @@ export default function HomeScreen() {
               Alert.alert('Info', 'All classes are already marked!');
             }
           } catch (error: any) {
+            handleSupabaseError(error, "Could not fetch schedule");
             setLoading(false);
-            Alert.alert('Error', error.message);
+            //Alert.alert('Error', error.message);
           }
         }
       }
@@ -490,8 +499,9 @@ export default function HomeScreen() {
               Alert.alert('Info', 'All classes are already marked!');
             }
           } catch (error: any) {
+            handleSupabaseError(error, "Could not fetch schedule");
             setLoading(false);
-            Alert.alert('Error', error.message);
+            //Alert.alert('Error', error.message);
           }
         }
       }

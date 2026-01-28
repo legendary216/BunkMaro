@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect,useCallback } from "react";
 import {
   StyleSheet,
   View,
@@ -14,15 +14,13 @@ import {
   IconButton,
   Avatar,
   Surface,
-  Provider,
-  Portal,
-  Modal,
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Calendar } from "react-native-calendars";
 import { supabase } from "../../utils/supabase";
 import ScreenWrapper from "../ScreenWrapper";
-import { useRouter } from "expo-router";
+import { useRouter ,useFocusEffect } from "expo-router";
+
 // --- THEME CONSTANTS ---
 const THEME = {
   bg: "#121212",
@@ -43,31 +41,48 @@ export default function CalendarScreen() {
   );
   const [combinedData, setCombinedData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [semesterId, setSemesterId] = useState<any>(null);
 
-  // 1. Get Active Semester ID
+  // Semester State
+  const [semesterId, setSemesterId] = useState<any>(null);
+  const [semesterStart, setSemesterStart] = useState<string | null>(null);
+
+  // 1. Get Active Semester & Start Date
   useEffect(() => {
     const getSem = async () => {
       const {
         data: { user },
       } = await supabase.auth.getUser();
       if (!user) return;
+
       const { data } = await supabase
         .from("semesters")
-        .select("id")
+        .select("id, start_date") // <--- Fetch start_date
         .eq("user_id", user.id)
         .eq("is_active", true)
         .maybeSingle();
-      if (data) setSemesterId(data.id);
+
+      if (data) {
+        setSemesterId(data.id);
+        setSemesterStart(data.start_date); // Store it
+
+        // If today is BEFORE start date, jump to start date
+        const today = new Date().toLocaleDateString("en-CA");
+        if (data.start_date && today < data.start_date) {
+          setSelectedDate(data.start_date);
+        }
+      }
     };
     getSem();
   }, []);
 
   // 2. Fetch Data
-  useEffect(() => {
-    if (semesterId) fetchDataForDate(selectedDate);
-  }, [selectedDate, semesterId]);
-
+ useFocusEffect(
+    useCallback(() => {
+      if (semesterId) {
+        fetchDataForDate(selectedDate);
+      }
+    }, [selectedDate, semesterId]) 
+  );
   const fetchDataForDate = async (date: string) => {
     setLoading(true);
     try {
@@ -104,16 +119,28 @@ export default function CalendarScreen() {
 
       setCombinedData(merged);
     } catch (e: any) {
-      console.log(e.message);
+      if (e.message.includes('Network request failed') || e.message.includes('fetch failed')) {
+         Alert.alert("Offline 📶", "Please check your internet connection.");
+      } else {
+         console.log(e.message); // Log other errors silently for fetch
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  // 3. Mark Attendance
+  // 3. Mark Attendance (Guarded)
   const handleMark = async (item: any, status: string) => {
+    // GUARD: Don't allow marking before semester starts
+    if (semesterStart && selectedDate < semesterStart) {
+      Alert.alert(
+        "Hold up!",
+        "You can't mark attendance before the semester starts.",
+      );
+      return;
+    }
+
     try {
-      // Optimistic UI Update (Optional, but makes it snappy)
       setLoading(true);
       const {
         data: { user },
@@ -134,12 +161,26 @@ export default function CalendarScreen() {
 
       await fetchDataForDate(selectedDate);
     } catch (e: any) {
-      Alert.alert("Error", e.message);
+    let msg = e.message;
+      // FIX: Friendly message for network errors
+      if (msg.includes('Network request failed') || msg.includes('fetch failed')) {
+          msg = "Unable to save. Please check your internet connection.";
+      }
+      Alert.alert('Error', msg);
       setLoading(false);
     }
   };
 
   const markWholeDayHoliday = () => {
+    // GUARD
+    if (semesterStart && selectedDate < semesterStart) {
+      Alert.alert(
+        "Hold up!",
+        "You can't mark holidays before the semester starts.",
+      );
+      return;
+    }
+
     Alert.alert(
       "Mark Holiday?",
       `Mark ${new Date(selectedDate).toDateString()} as a Holiday?`,
@@ -178,8 +219,13 @@ export default function CalendarScreen() {
               await fetchDataForDate(selectedDate);
               Alert.alert("Success", "Date marked as Holiday!");
             } catch (e: any) {
-              Alert.alert("Error", e.message);
-            } finally {
+              let msg = e.message;
+              // FIX: Friendly message for network errors
+              if (msg.includes('Network request failed') || msg.includes('fetch failed')) {
+                  msg = "Unable to save holiday. You seem to be offline.";
+              }Alert.alert("Error", e.message);
+                } 
+                finally {
               setLoading(false);
             }
           },
@@ -218,16 +264,25 @@ export default function CalendarScreen() {
     }
   };
 
-  // --- RENDER ITEM (TIMELINE STYLE) ---
+  // --- RENDER ITEM ---
   const todayStr = new Date().toLocaleDateString("en-CA");
   const isFuture = selectedDate > todayStr;
+
+  // NEW: Check if date is before semester start
+  const isBeforeStart = semesterStart ? selectedDate < semesterStart : false;
 
   const renderItem = ({ item, index }: { item: any; index: number }) => {
     const isPending = !item.log;
     const isLast = index === combinedData.length - 1;
 
+    // Logic: Is this item interactable?
+    // It is NOT interactable if:
+    // 1. It is in the Future
+    // 2. It is Before the Semester Started
+    const isInteractable = !isFuture && !isBeforeStart;
+
     const showEditMenu = () => {
-      if (isFuture) return;
+      if (!isInteractable) return;
       Alert.alert("Edit Record", "Update status for this class:", [
         { text: "Cancel", style: "cancel" },
         { text: "Present ✅", onPress: () => handleMark(item, "PRESENT") },
@@ -237,7 +292,7 @@ export default function CalendarScreen() {
     };
 
     return (
-      <View style={{ flexDirection: "row", opacity: isFuture ? 0.6 : 1 }}>
+      <View style={{ flexDirection: "row", opacity: isInteractable ? 1 : 0.5 }}>
         {/* Left: Time */}
         <View style={{ width: 60, alignItems: "flex-end", marginRight: 15 }}>
           <Text
@@ -263,9 +318,7 @@ export default function CalendarScreen() {
               borderRadius: 6,
               backgroundColor: item.log
                 ? getStatusColor(item.log.status)
-                : isFuture
-                  ? "#333"
-                  : "#555",
+                : "#555",
               borderWidth: 2,
               borderColor: THEME.bg,
               zIndex: 1,
@@ -285,8 +338,8 @@ export default function CalendarScreen() {
 
         {/* Right: Content Card */}
         <TouchableOpacity
-          activeOpacity={isFuture ? 1 : 0.7}
-          onLongPress={isFuture ? undefined : showEditMenu}
+          activeOpacity={isInteractable ? 0.7 : 1}
+          onLongPress={isInteractable ? showEditMenu : undefined}
           style={{ flex: 1, paddingBottom: 25, paddingLeft: 15 }}
         >
           <Surface style={styles.timelineCard} elevation={1}>
@@ -305,14 +358,14 @@ export default function CalendarScreen() {
                   {item.subjects?.name}
                 </Text>
 
-                {/* Logic for Status Display */}
                 <View style={{ marginTop: 8 }}>
-                  {isFuture ? (
+                  {!isInteractable ? (
                     <View style={styles.badgePending}>
-                      <Text style={styles.badgeTextPending}>UPCOMING</Text>
+                      <Text style={styles.badgeTextPending}>
+                        {isBeforeStart ? "NOT STARTED" : "UPCOMING"}
+                      </Text>
                     </View>
                   ) : isPending ? (
-                    // Pending: Show Buttons
                     <View style={{ flexDirection: "row", gap: 10 }}>
                       <Button
                         mode="contained"
@@ -336,7 +389,6 @@ export default function CalendarScreen() {
                       </Button>
                     </View>
                   ) : (
-                    // Marked: Show Neon Badge
                     <View
                       style={[
                         styles.badgeNeon,
@@ -375,8 +427,8 @@ export default function CalendarScreen() {
 
   return (
     <ScreenWrapper
-      onSwipeRight={() => router.push("/")} // Go to Dashboard
-      onSwipeLeft={() => router.push("/profile")} // Go to Profile
+      onSwipeRight={() => router.push("/")}
+      onSwipeLeft={() => router.push("/profile")}
     >
       <SafeAreaView style={[styles.container, { backgroundColor: THEME.bg }]}>
         <View style={{ padding: 15 }}>
@@ -388,30 +440,35 @@ export default function CalendarScreen() {
           </Text>
         </View>
 
-        {/* CALENDAR COMPONENT */}
         <View style={{ paddingHorizontal: 10, marginBottom: 10 }}>
           <Calendar
-            // Force re-render if theme changes (optional but good practice)
             key={"dark-calendar"}
             current={selectedDate}
-          onDayPress={(day: any) => {
-            // Only trigger if selecting a DIFFERENT day
-            if (day.dateString !== selectedDate) {
-               setLoading(true);     // 1. Immediately show loader
-               setCombinedData([]);  // 2. Immediately clear old logs
-               setSelectedDate(day.dateString); // 3. Then update date
-            }
-          }}
-            // CRITICAL: Explicitly set backgrounds to the Dark Hex Code
+            // --- FIX: Block dates before semester starts ---
+            minDate={semesterStart || undefined}
+            onDayPress={(day: any) => {
+              if (day.dateString !== selectedDate) {
+                setLoading(true);
+                setCombinedData([]);
+                setSelectedDate(day.dateString);
+              }
+            }}
+            markedDates={{
+              [selectedDate]: {
+                selected: true,
+                selectedColor: THEME.accent,
+                selectedTextColor: "#000000",
+              },
+            }}
             theme={{
-              backgroundColor: THEME.bg, // #121212
-              calendarBackground: THEME.bg, // #121212
+              backgroundColor: THEME.bg,
+              calendarBackground: THEME.bg,
               textSectionTitleColor: THEME.textSecondary,
               selectedDayBackgroundColor: THEME.accent,
               selectedDayTextColor: "#000000",
               todayTextColor: THEME.accent,
-              dayTextColor: THEME.textPrimary, // White text
-              textDisabledColor: "#333333", // Dark grey for disabled days
+              dayTextColor: THEME.textPrimary,
+              textDisabledColor: "#333333", // Makes disabled dates look "off"
               dotColor: THEME.accent,
               monthTextColor: THEME.textPrimary,
               indicatorColor: THEME.accent,
@@ -425,7 +482,6 @@ export default function CalendarScreen() {
         <Divider style={{ backgroundColor: THEME.divider }} />
 
         <View style={styles.listContainer}>
-          {/* HEADER ROW */}
           <View
             style={{
               flexDirection: "row",
@@ -441,7 +497,8 @@ export default function CalendarScreen() {
               {new Date(selectedDate).toDateString()}
             </Text>
 
-            {!isFuture && (
+            {/* Hide Holiday button if date is not interactable */}
+            {!isFuture && !isBeforeStart && (
               <TouchableOpacity onPress={markWholeDayHoliday}>
                 <Text style={{ color: "#4FC3F7", fontWeight: "bold" }}>
                   Set Holiday 🏖️
@@ -468,7 +525,9 @@ export default function CalendarScreen() {
                     iconColor={THEME.textSecondary}
                   />
                   <Text style={{ color: THEME.textSecondary }}>
-                    No classes on this date.
+                    {isBeforeStart
+                      ? "Semester hadn't started yet."
+                      : "No classes on this date."}
                   </Text>
                 </View>
               }
@@ -492,7 +551,6 @@ const styles = StyleSheet.create({
     borderColor: "#333",
   },
 
-  // Badges
   badgePending: {
     backgroundColor: "#252525",
     borderRadius: 6,

@@ -15,6 +15,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { scheduleDailyReminder, cancelReminders } from '../../utils/notifications';
 import ScreenWrapper from '../ScreenWrapper';
+import { handleSupabaseError } from '../../utils/errorHandler';
 
 import { supabase } from "../../utils/supabase";
 
@@ -84,8 +85,9 @@ export default function ProfileScreen() {
             if (error) throw error;
             router.replace('/auth');
           } catch (error: any) {
+            handleSupabaseError(error, "Could not fetch schedule");
             setLoading(false);
-            Alert.alert('Error', error.message);
+            //Alert.alert('Error', error.message);
           }
         }
       }

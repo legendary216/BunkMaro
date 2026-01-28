@@ -22,7 +22,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { DateTimePickerAndroid } from "@react-native-community/datetimepicker";
 import { useRouter } from "expo-router";
-
+import { handleSupabaseError } from '../utils/errorHandler';
 import { supabase } from "../utils/supabase";
 
 // --- THEME CONSTANTS ---
@@ -99,6 +99,7 @@ export default function ManageTimetableScreen() {
         .eq("semester_id", sem.id);
       if (subData) setSubjects(subData);
     } catch (error) {
+      handleSupabaseError(error, "Could not fetch schedule");
       console.log(error);
     }
     finally{
@@ -181,7 +182,8 @@ export default function ManageTimetableScreen() {
       setNewSlotSubject(null);
       fetchSlots(semesterId, selectedDay);
     } catch (error: any) {
-      Alert.alert("Error", error.message);
+      handleSupabaseError(error, "Could not fetch schedule");
+      //Alert.alert("Error", error.message);
     } finally {
       setLoading(false);
     }
